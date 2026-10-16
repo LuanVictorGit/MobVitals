@@ -12,7 +12,7 @@ All visual indicators and corpse persistence are rendered on the client side wit
 ---
 
 ## 2. Current Version
-**Version:** `1.1.0`
+**Version:** `1.0.0`
 
 ---
 
@@ -45,7 +45,7 @@ mvn clean test
 mvn clean package
 ```
 
-The compiled artifact is generated at `target/MobVitals-1.1.0.jar`.
+The compiled artifact is generated at `target/MobVitals-1.0.0.jar`.
 
 ---
 
@@ -60,7 +60,7 @@ The compiled artifact is generated at `target/MobVitals-1.1.0.jar`.
 
 ### Installation Steps
 1. Download and install `packetevents-spigot-2.14.0.jar` into your server's `plugins/` folder.
-2. Place `MobVitals-1.1.0.jar` into the `plugins/` folder.
+2. Place `MobVitals-1.0.0.jar` into the `plugins/` folder.
 3. Start or reload the server (`plugman reload MobVitals` or restart).
 4. Customize options in `plugins/MobVitals/config.yml`.
 
