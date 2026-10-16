@@ -108,13 +108,12 @@ MobVitals/
 ---
 
 ## 9. Implemented Features
-1. **Hybrid Packet Visual Engine:** Automatically selects native `EntityTypes.TEXT_DISPLAY` on Minecraft 1.19.4+ through 26.2+ (billboard `CENTER`, zero collision, zero hitbox, completely pass-through and click-through) and falls back to marker ArmorStands on legacy versions (< 1.19.4).
+1. **Intangible Packet Visual Engine:** Employs virtual marker ArmorStands (Marker `0x10`, Invisible `0x20`, No Gravity `0x01`) with calibrated eye-height offset (`-1.25 blocks`), rendering crisp vanilla nametag billboards across all Minecraft versions (1.16.5 through 26.2+). Zero hitboxes, zero collisions, zero click/attack interference, and immune to display-entity client culling bugs.
 2. **Combat-Only Auto-Hiding Health Bar:** Overhead health indicators remain completely hidden during peaceful exploration and appear only when an entity sustains damage or heals, automatically vanishing after `damaged-display-seconds` (default: 4.0s).
 3. **Health Variation Popups:**
-   - Real-time floating damage holograms (`-<val> ❤`) with subtle upward drift (`0.032` blocks/tick) and random lateral offsets to prevent clutter.
+   - Real-time floating damage holograms (`-<val> ❤`) with subtle upward drift (`0.035` blocks/tick) and random lateral offsets to prevent visual clutter.
    - Distinct floating heal holograms (`+<val> 💚`) with identical smooth drift.
-   - Robust calculation supporting partial healing, natural regeneration, absorption hearts, and fatal damage.
-   - Coalesced 1-tick verification to prevent duplicate popups or race conditions during multi-hit ticks.
+   - Instant event-driven calculation directly at `MONITOR` priority supporting partial healing, natural regeneration, absorption hearts, and fatal hits.
 4. **Strictly Centered Corpse Particles:** Ambient death particles emanate directly from the center of the fallen body `(x, y + bodyCenterY, z)` rather than wide orbital rings, maintaining thematic visual fidelity.
 5. **Smart Dense Corpse Reduction:** Dynamically calculates death cluster density within `dense-radius` (default: 4.0m) and scales corpse duration proportionally (from 1.0x down to 0.15x) while accelerating dissolution of older corpses in the pile to eliminate clutter.
 6. **Smooth Dissolution Animation:** Expiring corpses burst into thematic finale particles and custom audio before the client destroys the entity, guaranteeing no abrupt visual cuts or lingering ghost models.
@@ -160,28 +159,24 @@ The `config.yml` file contains full English explanations for every option:
    ```
 3. Deploy to test server:
    ```bash
-   Copy-Item target/MobVitals-1.1.0.jar c:/Users/.../servidor/plugins/ -Force
+   Copy-Item target/MobVitals-1.0.0.jar c:/Users/.../servidor/plugins/ -Force
    plugman reload MobVitals
    ```
 
 ---
 
 ## 13. Known Limitations and Design Decisions
-- **TextDisplay Modern Choice:** Leverages `EntityTypes.TEXT_DISPLAY` on 1.19.4+ / 26.2 to completely prevent wooden armor stand models, eliminate raycast blocking, and guarantee zero collision with player attacks.
+- **Intangible Marker ArmorStands:** Virtual marker ArmorStands provide universal cross-version nametag rendering across 1.16.5–26.2+. Because Marker (`0x10`) gives a 0x0x0 bounding box, players and projectiles pass right through with zero physical collision.
 - **Packet Interception Lifecycle:** When a corpse expires, the delayed destroy flag is removed *prior* to broadcasting the destroy packet, ensuring `VitalPacketListener` does not intercept the genuine cleanup packet.
 - **Purely Virtual Entities:** Zero physical entities are ever spawned on the server; all visuals are packet-driven via PacketEvents.
 
 ---
 
 ## 14. Version History
-- **1.1.0 (2026-10-16):**
-  - Switched visual rendering engine to native `EntityTypes.TEXT_DISPLAY` on 1.19.4+ / 26.2, eliminating ArmorStand mannequins and physical raycast blocking.
-  - Implemented health variation popups (`-<val> ❤` damage and `+<val> 💚` heal) with drift animation, absorption hearts support, and fatal damage handling.
-  - Added smart dense corpse reduction system to prevent piling of dead bodies.
-  - Centered corpse ambient particles strictly over the fallen body.
-  - Fixed corpse destroy packet interception race condition.
 - **1.0.0 (2026-10-16):**
-  - Initial release with PacketEvents health indicators and lying corpse animations.
+  - Initial release with PacketEvents real-time health indicators, floating damage/heal popups, and cinematic lying corpse animations.
+  - Implemented smart dense corpse reduction and centered corpse ambient particles.
+  - Intangible marker armor stand hologram engine with zero collision and instant event-driven damage/heal dispatch.
 
 ---
 

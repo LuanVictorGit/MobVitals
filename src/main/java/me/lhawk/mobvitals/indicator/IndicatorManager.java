@@ -4,9 +4,9 @@ import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
-import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.util.Vector3d;
+import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
@@ -20,7 +20,6 @@ import org.bukkit.Location;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Animals;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
@@ -44,11 +43,10 @@ public final class IndicatorManager {
     private final Plugin plugin;
     private final PluginConfig config;
 
-    private final AtomicInteger indicatorIdCounter = new AtomicInteger(-100000);
+    private final AtomicInteger indicatorIdCounter = new AtomicInteger(1_500_000_000);
     private final Map<Integer, HealthIndicator> activeIndicators = new ConcurrentHashMap<>();
     private final Map<Integer, VariationPopup> activePopups = new ConcurrentHashMap<>();
     private final Map<Integer, Double> recordedHealthMap = new ConcurrentHashMap<>();
-    private final Set<Integer> pendingChecks = ConcurrentHashMap.newKeySet();
     private final Set<UUID> toggledOffPlayers = ConcurrentHashMap.newKeySet();
 
     private Schedulers.TaskHandle updateTask;
@@ -81,7 +79,6 @@ public final class IndicatorManager {
         activeIndicators.clear();
         activePopups.clear();
         recordedHealthMap.clear();
-        pendingChecks.clear();
         toggledOffPlayers.clear();
     }
 
@@ -129,29 +126,42 @@ public final class IndicatorManager {
         recordedHealthMap.putIfAbsent(entity.getEntityId(), getEffectiveHealth(entity));
     }
 
-    public void onDamageEvent(LivingEntity entity) {
-        if (!config.isIndicatorsEnabled() || entity == null || !isEligible(entity)) return;
+    public void onDamage(LivingEntity entity, double finalDamage) {
+        if (!config.isIndicatorsEnabled() || entity == null || !isEligibleType(entity)) return;
+
         int entityId = entity.getEntityId();
-        recordedHealthMap.putIfAbsent(entityId, getEffectiveHealth(entity));
-        scheduleHealthCheck(entity);
+        double currentHealth = Math.max(0.0, entity.getHealth());
+        double damageAmount = Math.max(0.0, Math.min(currentHealth, finalDamage));
+        double healthAfter = Math.max(0.0, currentHealth - damageAmount);
+        double maxHealth = getMaxHealth(entity);
+
+        recordedHealthMap.put(entityId, healthAfter);
+
+        if (damageAmount >= config.getPopupThreshold() && config.isPopupsEnabled()) {
+            spawnVariationPopup(entity, damageAmount, true);
+        }
+
+        if (healthAfter > 0.0) {
+            showOrUpdateIndicator(entity, healthAfter, maxHealth);
+        }
     }
 
-    public void onRegainHealthEvent(LivingEntity entity) {
-        if (!config.isIndicatorsEnabled() || entity == null || !isEligible(entity)) return;
-        int entityId = entity.getEntityId();
-        recordedHealthMap.putIfAbsent(entityId, getEffectiveHealth(entity));
-        scheduleHealthCheck(entity);
-    }
+    public void onHeal(LivingEntity entity, double amount) {
+        if (!config.isIndicatorsEnabled() || entity == null || !isEligibleType(entity)) return;
 
-    private void scheduleHealthCheck(LivingEntity entity) {
         int entityId = entity.getEntityId();
-        if (!pendingChecks.add(entityId)) return;
-        Schedulers.later(plugin, 1L, () -> {
-            pendingChecks.remove(entityId);
-            if (entity.isValid() && !entity.isDead() && entity.getHealth() > 0) {
-                handleHealthChange(entity);
-            }
-        });
+        double currentHealth = Math.max(0.0, entity.getHealth());
+        double maxHealth = getMaxHealth(entity);
+        double healthAfter = Math.min(maxHealth, currentHealth + amount);
+        double actualHeal = Math.max(0.0, healthAfter - currentHealth);
+
+        recordedHealthMap.put(entityId, healthAfter);
+
+        if (actualHeal >= config.getPopupThreshold() && config.isPopupsEnabled()) {
+            spawnVariationPopup(entity, actualHeal, false);
+        }
+
+        showOrUpdateIndicator(entity, healthAfter, maxHealth);
     }
 
     public void handleHealthChange(LivingEntity entity) {
@@ -173,6 +183,13 @@ public final class IndicatorManager {
             }
         }
 
+        showOrUpdateIndicator(entity, currentHealth, maxHealth);
+    }
+
+    public void showOrUpdateIndicator(LivingEntity entity, double currentHealth, double maxHealth) {
+        if (!Platform.hasPacketEvents() || !config.isIndicatorsEnabled() || entity == null) return;
+
+        int entityId = entity.getEntityId();
         HealthIndicator indicator = activeIndicators.get(entityId);
         if (indicator == null) {
             indicator = new HealthIndicator(entity, getNextIndicatorId(), entity.getLocation(), currentHealth, maxHealth);
@@ -189,18 +206,18 @@ public final class IndicatorManager {
     public void handleEntityDeath(LivingEntity entity) {
         if (entity == null) return;
         int entityId = entity.getEntityId();
-        pendingChecks.remove(entityId);
         Double previousHealthObj = recordedHealthMap.remove(entityId);
         double fatalDiff = previousHealthObj != null ? previousHealthObj : getMaxHealth(entity);
-        if (fatalDiff >= config.getPopupThreshold() && config.isPopupsEnabled() && config.isIndicatorsEnabled() && isEligible(entity)) {
-            spawnVariationPopup(entity, fatalDiff, true);
+        if (fatalDiff >= config.getPopupThreshold() && config.isPopupsEnabled() && config.isIndicatorsEnabled() && isEligibleType(entity)) {
+            if (!activePopups.containsKey(entityId)) {
+                spawnVariationPopup(entity, fatalDiff, true);
+            }
         }
         removeEntity(entityId);
     }
 
     public void removeEntity(int entityId) {
         recordedHealthMap.remove(entityId);
-        pendingChecks.remove(entityId);
         HealthIndicator indicator = activeIndicators.remove(entityId);
         if (indicator == null || !Platform.hasPacketEvents()) return;
         destroyForViewers(indicator);
@@ -251,7 +268,7 @@ public final class IndicatorManager {
             }
 
             Location pLoc = popup.getLocation();
-            pLoc.add(0.0, 0.032, 0.0);
+            pLoc.add(0.0, 0.035, 0.0);
             teleportPopupForViewers(popup, pLoc);
             return false;
         });
@@ -263,11 +280,11 @@ public final class IndicatorManager {
         Location eLoc = entity.getLocation();
         if (eLoc.getWorld() == null) return;
 
-        double jitterX = (ThreadLocalRandom.current().nextDouble() - 0.5) * 0.65;
-        double jitterZ = (ThreadLocalRandom.current().nextDouble() - 0.5) * 0.65;
-        double spawnY = Math.max(0.3, entity.getHeight() * 0.75) + (ThreadLocalRandom.current().nextDouble() * 0.25);
+        double jitterX = (ThreadLocalRandom.current().nextDouble() - 0.5) * 0.7;
+        double jitterZ = (ThreadLocalRandom.current().nextDouble() - 0.5) * 0.7;
+        double spawnY = eLoc.getY() + Math.max(0.35, entity.getHeight() * 0.65) + (ThreadLocalRandom.current().nextDouble() * 0.25);
 
-        Location popupLoc = eLoc.clone().add(jitterX, spawnY, jitterZ);
+        Location popupLoc = new Location(eLoc.getWorld(), eLoc.getX() + jitterX, spawnY, eLoc.getZ() + jitterZ);
         String valStr = (amount == (long) amount) ? String.valueOf((long) amount) : String.format(Locale.ROOT, "%.1f", amount);
         String template = isDamage ? config.getDamageFormat() : config.getHealFormat();
         String formatted = template.replace("<value>", valStr);
@@ -295,7 +312,6 @@ public final class IndicatorManager {
         if (loc.getWorld() == null) return;
 
         double viewDistSq = config.getViewDistance() * config.getViewDistance();
-        Set<UUID> currentViewers = indicator.getViewers();
 
         for (Player p : loc.getWorld().getPlayers()) {
             UUID pUid = p.getUniqueId();
@@ -320,26 +336,22 @@ public final class IndicatorManager {
         Component comp = formatIndicator(entity, health, maxHealth);
         int virtualId = indicator.getVirtualIndicatorId();
 
-        boolean textDisplay = Platform.isTextDisplaySupported();
-        EntityType type = textDisplay ? EntityTypes.TEXT_DISPLAY : EntityTypes.ARMOR_STAND;
-        double yOffset = textDisplay ? (entity.getHeight() + config.getHeightOffset()) : (entity.getHeight() + config.getHeightOffset() - 0.95);
+        double yOffset = entity.getHeight() + config.getHeightOffset() - 1.25;
         Vector3d pos = new Vector3d(loc.getX(), loc.getY() + yOffset, loc.getZ());
 
         WrapperPlayServerSpawnEntity spawn = new WrapperPlayServerSpawnEntity(
                 virtualId,
                 Optional.of(UUID.randomUUID()),
-                type,
+                EntityTypes.ARMOR_STAND,
                 pos,
                 0f, 0f, 0f, 0,
                 Optional.empty()
         );
 
-        WrapperPlayServerEntityMetadata meta = createMetadataPacket(virtualId, comp, textDisplay);
+        WrapperPlayServerEntityMetadata meta = createMetadataPacket(virtualId, comp);
 
-        try {
-            PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, spawn);
-            PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, meta);
-        } catch (Throwable ignored) {}
+        sendPacket(player, spawn);
+        sendPacket(player, meta);
     }
 
     private void spawnPopupForPlayer(Player player, VariationPopup popup) {
@@ -347,32 +359,26 @@ public final class IndicatorManager {
 
         int virtualId = popup.getVirtualId();
         Location loc = popup.getLocation();
-        boolean textDisplay = Platform.isTextDisplaySupported();
-        EntityType type = textDisplay ? EntityTypes.TEXT_DISPLAY : EntityTypes.ARMOR_STAND;
-        double yOffset = textDisplay ? 0.0 : -0.95;
-        Vector3d pos = new Vector3d(loc.getX(), loc.getY() + yOffset, loc.getZ());
+        Vector3d pos = new Vector3d(loc.getX(), loc.getY() - 1.25, loc.getZ());
 
         WrapperPlayServerSpawnEntity spawn = new WrapperPlayServerSpawnEntity(
                 virtualId,
                 Optional.of(UUID.randomUUID()),
-                type,
+                EntityTypes.ARMOR_STAND,
                 pos,
                 0f, 0f, 0f, 0,
                 Optional.empty()
         );
 
-        WrapperPlayServerEntityMetadata meta = createMetadataPacket(virtualId, popup.getComponent(), textDisplay);
+        WrapperPlayServerEntityMetadata meta = createMetadataPacket(virtualId, popup.getComponent());
 
-        try {
-            PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, spawn);
-            PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, meta);
-        } catch (Throwable ignored) {}
+        sendPacket(player, spawn);
+        sendPacket(player, meta);
     }
 
     private void teleportIndicatorForViewers(HealthIndicator indicator, LivingEntity entity, Location loc) {
         if (!Platform.hasPacketEvents()) return;
-        boolean textDisplay = Platform.isTextDisplaySupported();
-        double yOffset = textDisplay ? (entity.getHeight() + config.getHeightOffset()) : (entity.getHeight() + config.getHeightOffset() - 0.95);
+        double yOffset = entity.getHeight() + config.getHeightOffset() - 1.25;
         Vector3d pos = new Vector3d(loc.getX(), loc.getY() + yOffset, loc.getZ());
         WrapperPlayServerEntityTeleport tp = new WrapperPlayServerEntityTeleport(
                 indicator.getVirtualIndicatorId(),
@@ -383,18 +389,14 @@ public final class IndicatorManager {
         for (UUID uid : indicator.getViewers()) {
             Player p = plugin.getServer().getPlayer(uid);
             if (p != null && p.isOnline()) {
-                try {
-                    PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, tp);
-                } catch (Throwable ignored) {}
+                sendPacket(p, tp);
             }
         }
     }
 
     private void teleportPopupForViewers(VariationPopup popup, Location loc) {
         if (!Platform.hasPacketEvents()) return;
-        boolean textDisplay = Platform.isTextDisplaySupported();
-        double yOffset = textDisplay ? 0.0 : -0.95;
-        Vector3d pos = new Vector3d(loc.getX(), loc.getY() + yOffset, loc.getZ());
+        Vector3d pos = new Vector3d(loc.getX(), loc.getY() - 1.25, loc.getZ());
         WrapperPlayServerEntityTeleport tp = new WrapperPlayServerEntityTeleport(
                 popup.getVirtualId(),
                 pos,
@@ -404,59 +406,55 @@ public final class IndicatorManager {
         for (UUID uid : popup.getViewers()) {
             Player p = plugin.getServer().getPlayer(uid);
             if (p != null && p.isOnline()) {
-                try {
-                    PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, tp);
-                } catch (Throwable ignored) {}
+                sendPacket(p, tp);
             }
         }
     }
 
     private void updateMetadataForViewers(HealthIndicator indicator, LivingEntity entity) {
         if (!Platform.hasPacketEvents()) return;
-        Component comp = formatIndicator(entity, entity.getHealth(), getMaxHealth(entity));
-        WrapperPlayServerEntityMetadata meta = createMetadataPacket(indicator.getVirtualIndicatorId(), comp, Platform.isTextDisplaySupported());
+        Component comp = formatIndicator(entity, indicator.getLastHealth(), indicator.getLastMaxHealth());
+        WrapperPlayServerEntityMetadata meta = createMetadataPacket(indicator.getVirtualIndicatorId(), comp);
 
         for (UUID uid : indicator.getViewers()) {
             Player p = plugin.getServer().getPlayer(uid);
             if (p != null && p.isOnline()) {
-                try {
-                    PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, meta);
-                } catch (Throwable ignored) {}
+                sendPacket(p, meta);
             }
         }
     }
 
-    private WrapperPlayServerEntityMetadata createMetadataPacket(int virtualId, Component component, boolean textDisplay) {
+    private WrapperPlayServerEntityMetadata createMetadataPacket(int virtualId, Component component) {
         List<EntityData<?>> metadata = new ArrayList<>(5);
-        if (textDisplay) {
-            metadata.add(new EntityData<>(15, EntityDataTypes.BYTE, (byte) 3));
-            metadata.add(new EntityData<>(23, EntityDataTypes.ADV_COMPONENT, component));
-            metadata.add(new EntityData<>(25, EntityDataTypes.INT, 0));
-            metadata.add(new EntityData<>(27, EntityDataTypes.BYTE, (byte) 1));
-        } else {
-            metadata.add(new EntityData<>(0, EntityDataTypes.BYTE, (byte) 0x20));
-            metadata.add(new EntityData<>(2, EntityDataTypes.OPTIONAL_ADV_COMPONENT, Optional.of(component)));
-            metadata.add(new EntityData<>(3, EntityDataTypes.BOOLEAN, true));
-            metadata.add(new EntityData<>(5, EntityDataTypes.BOOLEAN, true));
+        metadata.add(new EntityData<>(0, EntityDataTypes.BYTE, (byte) 0x20));
+        metadata.add(new EntityData<>(2, EntityDataTypes.OPTIONAL_ADV_COMPONENT, Optional.of(component)));
+        metadata.add(new EntityData<>(3, EntityDataTypes.BOOLEAN, true));
+        metadata.add(new EntityData<>(5, EntityDataTypes.BOOLEAN, true));
 
-            int flagsIndex = 15;
-            try {
-                if (PacketEvents.getAPI().getServerManager().getVersion().isOlderThan(ServerVersion.V_1_17)) {
-                    flagsIndex = 14;
-                }
-            } catch (Throwable ignored) {}
+        int flagsIndex = 15;
+        try {
+            if (PacketEvents.getAPI().getServerManager().getVersion().isOlderThan(ServerVersion.V_1_17)) {
+                flagsIndex = 14;
+            }
+        } catch (Throwable ignored) {}
 
-            metadata.add(new EntityData<>(flagsIndex, EntityDataTypes.BYTE, (byte) (0x01 | 0x08 | 0x10)));
-        }
+        metadata.add(new EntityData<>(flagsIndex, EntityDataTypes.BYTE, (byte) (0x01 | 0x08 | 0x10)));
         return new WrapperPlayServerEntityMetadata(virtualId, metadata);
+    }
+
+    private void sendPacket(Player player, PacketWrapper<?> packet) {
+        if (!Platform.hasPacketEvents() || player == null || !player.isOnline()) return;
+        try {
+            PacketEvents.getAPI().getPlayerManager().sendPacket(player, packet);
+        } catch (Throwable t) {
+            plugin.getLogger().warning("PacketEvents send error: " + t.getMessage());
+        }
     }
 
     private void destroyIndicatorForPlayer(Player player, int virtualId) {
         if (!Platform.hasPacketEvents() || player == null || !player.isOnline()) return;
-        try {
-            WrapperPlayServerDestroyEntities destroy = new WrapperPlayServerDestroyEntities(virtualId);
-            PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, destroy);
-        } catch (Throwable ignored) {}
+        WrapperPlayServerDestroyEntities destroy = new WrapperPlayServerDestroyEntities(virtualId);
+        sendPacket(player, destroy);
     }
 
     private void destroyForViewers(HealthIndicator indicator) {
@@ -465,9 +463,7 @@ public final class IndicatorManager {
         for (UUID uid : indicator.getViewers()) {
             Player p = plugin.getServer().getPlayer(uid);
             if (p != null && p.isOnline()) {
-                try {
-                    PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, destroy);
-                } catch (Throwable ignored) {}
+                sendPacket(p, destroy);
             }
         }
         indicator.getViewers().clear();
@@ -479,9 +475,7 @@ public final class IndicatorManager {
         for (UUID uid : popup.getViewers()) {
             Player p = plugin.getServer().getPlayer(uid);
             if (p != null && p.isOnline()) {
-                try {
-                    PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, destroy);
-                } catch (Throwable ignored) {}
+                sendPacket(p, destroy);
             }
         }
         popup.getViewers().clear();
@@ -566,9 +560,8 @@ public final class IndicatorManager {
         return TextUtil.parse(formatted);
     }
 
-    private boolean isEligible(LivingEntity entity) {
-        if (entity == null || !entity.isValid() || entity.isDead()) return false;
-        if (entity.getHealth() <= 0) return false;
+    public boolean isEligibleType(LivingEntity entity) {
+        if (entity == null) return false;
 
         String typeName = entity.getType().name().toUpperCase(Locale.ROOT);
         if (config.getBlacklist().contains(typeName)) return false;
@@ -594,6 +587,11 @@ public final class IndicatorManager {
         }
 
         return true;
+    }
+
+    public boolean isEligible(LivingEntity entity) {
+        if (entity == null || !entity.isValid() || entity.isDead() || entity.getHealth() <= 0) return false;
+        return isEligibleType(entity);
     }
 
     private boolean isBoss(LivingEntity entity) {
@@ -629,7 +627,7 @@ public final class IndicatorManager {
     }
 
     public int getNextIndicatorId() {
-        return indicatorIdCounter.decrementAndGet();
+        return indicatorIdCounter.incrementAndGet();
     }
 
     public int getActiveIndicatorCount() {

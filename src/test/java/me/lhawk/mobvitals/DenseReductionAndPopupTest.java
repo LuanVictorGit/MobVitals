@@ -13,7 +13,7 @@ public class DenseReductionAndPopupTest {
 
     @Test
     public void testVariationPopupLifecycle() {
-        int id = -100500;
+        int id = 1500000005;
         Component text = Component.text("-5 ❤");
         long expire = System.currentTimeMillis() + 1800L;
         VariationPopup popup = new VariationPopup(id, null, text, expire);
