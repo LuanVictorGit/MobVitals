@@ -58,6 +58,9 @@ public final class EntityVitalListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerRespawn(PlayerRespawnEvent event) {
         Player player = event.getPlayer();
+        int entityId = player.getEntityId();
+        corpseManager.removeCorpse(entityId);
+        indicatorManager.removeEntity(entityId);
         Schedulers.later(plugin, 2L, () -> {
             if (player.isOnline()) {
                 indicatorManager.recordEntityHealth(player);
@@ -68,6 +71,8 @@ public final class EntityVitalListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerQuit(PlayerQuitEvent event) {
+        int entityId = event.getPlayer().getEntityId();
+        corpseManager.removeCorpse(entityId);
         indicatorManager.onPlayerQuit(event.getPlayer());
     }
 }

@@ -177,6 +177,8 @@ The `config.yml` file contains full English explanations for every option:
   - Initial release with PacketEvents real-time health indicators, floating damage/heal popups, and cinematic lying corpse animations.
   - Implemented smart dense corpse reduction and centered corpse ambient particles.
   - Intangible marker armor stand hologram engine with zero collision and instant event-driven damage/heal dispatch.
+  - Fixed player infinite death animation loop by isolating player death lifecycle, preventing self-viewing death status packets, and bypassing delayed entity destroy for players.
+  - Resolved `NoClassDefFoundError: ComponentSerializer` by shading full Kyori Adventure libraries and utilizing JSON component metadata serialization for PacketEvents compatibility.
 
 ---
 

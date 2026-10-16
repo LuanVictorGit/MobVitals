@@ -33,10 +33,22 @@ public final class VitalPacketListener extends PacketListenerAbstract {
         int[] ids = destroy.getEntityIds();
         if (ids == null || ids.length == 0) return;
 
+        int recipientEntityId = -1;
+        try {
+            Object playerObj = event.getPlayer();
+            if (playerObj instanceof org.bukkit.entity.Player bp) {
+                recipientEntityId = bp.getEntityId();
+            }
+        } catch (Throwable ignored) {}
+
         List<Integer> kept = new ArrayList<>(ids.length);
         boolean interceptedAny = false;
 
         for (int id : ids) {
+            if (id == recipientEntityId) {
+                kept.add(id);
+                continue;
+            }
             if (corpseManager.isDelayedDestroy(id)) {
                 interceptedAny = true;
             } else {

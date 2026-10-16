@@ -427,7 +427,8 @@ public final class IndicatorManager {
     private WrapperPlayServerEntityMetadata createMetadataPacket(int virtualId, Component component) {
         List<EntityData<?>> metadata = new ArrayList<>(5);
         metadata.add(new EntityData<>(0, EntityDataTypes.BYTE, (byte) 0x20));
-        metadata.add(new EntityData<>(2, EntityDataTypes.OPTIONAL_ADV_COMPONENT, Optional.of(component)));
+        String json = TextUtil.toJson(component);
+        metadata.add(new EntityData<>(2, EntityDataTypes.OPTIONAL_COMPONENT, Optional.of(json)));
         metadata.add(new EntityData<>(3, EntityDataTypes.BOOLEAN, true));
         metadata.add(new EntityData<>(5, EntityDataTypes.BOOLEAN, true));
 

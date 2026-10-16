@@ -127,6 +127,10 @@ public enum DeathProfile {
         return finalePitch;
     }
 
+    public boolean isPlayer() {
+        return this == PLAYER;
+    }
+
     public static DeathProfile fromEntity(Entity entity) {
         if (entity == null) return ANIMAL;
         if (entity instanceof Player) return PLAYER;

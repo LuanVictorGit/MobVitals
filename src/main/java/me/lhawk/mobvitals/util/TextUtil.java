@@ -2,6 +2,7 @@ package me.lhawk.mobvitals.util;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.command.CommandSender;
 
@@ -10,10 +11,16 @@ import java.lang.reflect.Method;
 public final class TextUtil {
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
     private static final LegacyComponentSerializer LEGACY_SERIALIZER = LegacyComponentSerializer.legacySection();
+    private static final GsonComponentSerializer GSON_SERIALIZER = GsonComponentSerializer.gson();
     private static Method paperSendMessageMethod;
     private static boolean paperChecked = false;
 
     private TextUtil() {}
+
+    public static String toJson(Component component) {
+        if (component == null) return "{\"text\":\"\"}";
+        return GSON_SERIALIZER.serialize(component);
+    }
 
     public static Component parse(String miniMessageText) {
         if (miniMessageText == null || miniMessageText.isEmpty()) {

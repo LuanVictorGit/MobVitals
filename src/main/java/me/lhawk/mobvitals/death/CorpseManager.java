@@ -125,6 +125,14 @@ public final class CorpseManager {
         activeCorpses.clear();
     }
 
+    public void removeCorpse(int entityId) {
+        delayedDestroyIds.remove(entityId);
+        CorpseSession session = activeCorpses.remove(entityId);
+        if (session != null) {
+            sendDestroyToViewers(session);
+        }
+    }
+
     public boolean isDelayedDestroy(int entityId) {
         return delayedDestroyIds.contains(entityId);
     }
@@ -177,6 +185,7 @@ public final class CorpseManager {
         double viewDistSq = config.getViewDistance() * config.getViewDistance();
         Set<UUID> viewers = new HashSet<>();
         for (Player p : loc.getWorld().getPlayers()) {
+            if (entity instanceof Player && p.getUniqueId().equals(entity.getUniqueId())) continue;
             if (p.getLocation().distanceSquared(loc) <= viewDistSq) {
                 viewers.add(p.getUniqueId());
             }
@@ -184,7 +193,8 @@ public final class CorpseManager {
 
         if (viewers.isEmpty()) return;
 
-        if (config.isEnableCorpseBody()) {
+        boolean isPlayer = entity instanceof Player;
+        if (config.isEnableCorpseBody() && !isPlayer) {
             delayedDestroyIds.add(entityId);
         }
 
@@ -193,7 +203,7 @@ public final class CorpseManager {
         CorpseSession session = new CorpseSession(entityId, loc.clone(), profile, width, height, expireTime, viewers);
         activeCorpses.put(entityId, session);
 
-        if (config.isEnableCorpseBody()) {
+        if (config.isEnableCorpseBody() && !isPlayer) {
             sendCorpseStateToViewers(session);
         }
 
@@ -231,9 +241,12 @@ public final class CorpseManager {
 
             double viewDistSq = config.getViewDistance() * config.getViewDistance();
             for (Player p : loc.getWorld().getPlayers()) {
+                if (p.getEntityId() == entityId) continue;
                 if (p.getLocation().distanceSquared(loc) <= viewDistSq) {
                     if (session.getViewers().add(p.getUniqueId())) {
-                        sendCorpseStateToPlayer(p, session);
+                        if (config.isEnableCorpseBody() && !session.getProfile().isPlayer()) {
+                            sendCorpseStateToPlayer(p, session);
+                        }
                     }
                 }
             }
@@ -326,6 +339,8 @@ public final class CorpseManager {
     private void sendCorpseStateToPlayer(Player player, CorpseSession session) {
         if (!Platform.hasPacketEvents() || player == null || !player.isOnline()) return;
         int entityId = session.getEntityId();
+        if (player.getEntityId() == entityId) return;
+        if (session.getProfile().isPlayer()) return;
         int healthIndex = 9;
         try {
             if (PacketEvents.getAPI().getServerManager().getVersion().isOlderThan(ServerVersion.V_1_17)) {
@@ -350,11 +365,11 @@ public final class CorpseManager {
     }
 
     private void sendDestroyToViewers(CorpseSession session) {
-        if (!Platform.hasPacketEvents()) return;
+        if (!Platform.hasPacketEvents() || session.getProfile().isPlayer()) return;
         WrapperPlayServerDestroyEntities destroy = new WrapperPlayServerDestroyEntities(session.getEntityId());
         for (UUID uid : session.getViewers()) {
             Player p = plugin.getServer().getPlayer(uid);
-            if (p != null && p.isOnline()) {
+            if (p != null && p.isOnline() && p.getEntityId() != session.getEntityId()) {
                 try {
                     PacketEvents.getAPI().getPlayerManager().sendPacket(p, destroy);
                 } catch (Throwable ignored) {}
