@@ -1,12 +1,18 @@
 package me.lhawk.mobvitals.death;
 
 import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.manager.server.ServerVersion;
+import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
+import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
+import com.github.retrooper.packetevents.protocol.entity.pose.EntityPose;
 import com.github.retrooper.packetevents.protocol.particle.Particle;
 import com.github.retrooper.packetevents.protocol.particle.type.ParticleType;
 import com.github.retrooper.packetevents.protocol.particle.type.ParticleTypes;
 import com.github.retrooper.packetevents.util.Vector3d;
 import com.github.retrooper.packetevents.util.Vector3f;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityStatus;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerParticle;
 import me.lhawk.mobvitals.config.PluginConfig;
 import me.lhawk.mobvitals.util.Platform;
@@ -187,6 +193,10 @@ public final class CorpseManager {
         CorpseSession session = new CorpseSession(entityId, loc.clone(), profile, width, height, expireTime, viewers);
         activeCorpses.put(entityId, session);
 
+        if (config.isEnableCorpseBody()) {
+            sendCorpseStateToViewers(session);
+        }
+
         if (config.isEnableSoundEffects()) {
             for (UUID vid : viewers) {
                 Player vp = plugin.getServer().getPlayer(vid);
@@ -217,6 +227,15 @@ public final class CorpseManager {
                 activeCorpses.remove(entityId);
                 finishCorpse(session);
                 continue;
+            }
+
+            double viewDistSq = config.getViewDistance() * config.getViewDistance();
+            for (Player p : loc.getWorld().getPlayers()) {
+                if (p.getLocation().distanceSquared(loc) <= viewDistSq) {
+                    if (session.getViewers().add(p.getUniqueId())) {
+                        sendCorpseStateToPlayer(p, session);
+                    }
+                }
             }
 
             session.incrementTick();
@@ -294,6 +313,42 @@ public final class CorpseManager {
         sendDestroyToViewers(session);
     }
 
+    private void sendCorpseStateToViewers(CorpseSession session) {
+        if (!Platform.hasPacketEvents()) return;
+        for (UUID uid : session.getViewers()) {
+            Player p = plugin.getServer().getPlayer(uid);
+            if (p != null && p.isOnline()) {
+                sendCorpseStateToPlayer(p, session);
+            }
+        }
+    }
+
+    private void sendCorpseStateToPlayer(Player player, CorpseSession session) {
+        if (!Platform.hasPacketEvents() || player == null || !player.isOnline()) return;
+        int entityId = session.getEntityId();
+        int healthIndex = 9;
+        try {
+            if (PacketEvents.getAPI().getServerManager().getVersion().isOlderThan(ServerVersion.V_1_17)) {
+                healthIndex = 8;
+            }
+        } catch (Throwable ignored) {}
+
+        List<EntityData<?>> metadata = new ArrayList<>(3);
+        metadata.add(new EntityData<>(0, EntityDataTypes.BYTE, (byte) 0));
+        metadata.add(new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.DYING));
+        metadata.add(new EntityData<>(healthIndex, EntityDataTypes.FLOAT, 0.0f));
+
+        WrapperPlayServerEntityMetadata metaPacket = new WrapperPlayServerEntityMetadata(entityId, metadata);
+        WrapperPlayServerEntityStatus statusPacket = new WrapperPlayServerEntityStatus(entityId, (byte) 3);
+
+        try {
+            PacketEvents.getAPI().getPlayerManager().sendPacket(player, statusPacket);
+            PacketEvents.getAPI().getPlayerManager().sendPacket(player, metaPacket);
+        } catch (Throwable t) {
+            plugin.getLogger().warning("Corpse state send error: " + t.getMessage());
+        }
+    }
+
     private void sendDestroyToViewers(CorpseSession session) {
         if (!Platform.hasPacketEvents()) return;
         WrapperPlayServerDestroyEntities destroy = new WrapperPlayServerDestroyEntities(session.getEntityId());
@@ -301,7 +356,7 @@ public final class CorpseManager {
             Player p = plugin.getServer().getPlayer(uid);
             if (p != null && p.isOnline()) {
                 try {
-                    PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, destroy);
+                    PacketEvents.getAPI().getPlayerManager().sendPacket(p, destroy);
                 } catch (Throwable ignored) {}
             }
         }
@@ -347,7 +402,7 @@ public final class CorpseManager {
         if (player == null || profile == null) return;
         Location loc = player.getLocation();
         Set<UUID> singleViewer = Collections.singleton(player.getUniqueId());
-        CorpseSession previewSession = new CorpseSession(-999999, loc, profile, 0.6, 1.8, System.currentTimeMillis() + 3000L, singleViewer);
+        CorpseSession previewSession = new CorpseSession(1500999999, loc, profile, 0.6, 1.8, System.currentTimeMillis() + 3000L, singleViewer);
 
         Schedulers.timer(plugin, 1L, 4L, new Runnable() {
             private int ticks = 0;
