@@ -1,0 +1,72 @@
+package me.lhawk.mobvitals.listener;
+
+import me.lhawk.mobvitals.death.CorpseManager;
+import me.lhawk.mobvitals.indicator.IndicatorManager;
+import me.lhawk.mobvitals.util.Schedulers;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityRegainHealthEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.plugin.Plugin;
+
+public final class EntityVitalListener implements Listener {
+    private final Plugin plugin;
+    private final IndicatorManager indicatorManager;
+    private final CorpseManager corpseManager;
+
+    public EntityVitalListener(Plugin plugin, IndicatorManager indicatorManager, CorpseManager corpseManager) {
+        this.plugin = plugin;
+        this.indicatorManager = indicatorManager;
+        this.corpseManager = corpseManager;
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onEntityDamage(EntityDamageEvent event) {
+        if (event.getEntity() instanceof LivingEntity living) {
+            Schedulers.later(plugin, 1L, () -> {
+                if (living.isValid() && !living.isDead() && living.getHealth() > 0) {
+                    indicatorManager.onEntityDamageOrHeal(living);
+                }
+            });
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onEntityRegainHealth(EntityRegainHealthEvent event) {
+        if (event.getEntity() instanceof LivingEntity living) {
+            Schedulers.later(plugin, 1L, () -> {
+                if (living.isValid() && !living.isDead() && living.getHealth() > 0) {
+                    indicatorManager.onEntityDamageOrHeal(living);
+                }
+            });
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onEntityDeath(EntityDeathEvent event) {
+        LivingEntity living = event.getEntity();
+        indicatorManager.removeEntity(living.getEntityId());
+        corpseManager.onEntityDeath(living);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerRespawn(PlayerRespawnEvent event) {
+        Player player = event.getPlayer();
+        Schedulers.later(plugin, 2L, () -> {
+            if (player.isOnline()) {
+                indicatorManager.onEntityDamageOrHeal(player);
+            }
+        });
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        indicatorManager.onPlayerQuit(event.getPlayer());
+    }
+}

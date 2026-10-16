@@ -1,0 +1,106 @@
+# ==============================================================================
+# MobVitals - Configuration File
+# Real-time packet-based health indicators and cinematic death animations.
+# Compatible with Paper, Spigot, and Folia (Minecraft 1.16.5 - 26.2+).
+# Author: lHawk_ | Discord: https://minebuilders.com.br/discord
+# ==============================================================================
+
+# General settings
+general:
+  # Master switch for the plugin features.
+  enabled: true
+  # Maximum radius in blocks within which players can see health indicators and death effects.
+  # Recommended: 24.0 to 48.0.
+  view-distance: 32.0
+  # Frequency in server ticks for synchronizing indicator positions with moving entities.
+  # Lower values mean smoother movement; higher values conserve CPU ticks.
+  # Default: 2 (runs 10 times per second).
+  update-interval-ticks: 2
+
+# Floating health indicator settings (rendered 100% via PacketEvents)
+indicators:
+  # Whether floating health indicators are enabled.
+  enabled: true
+  # Vertical offset in blocks above the entity bounding box height.
+  # Default: 0.35 blocks.
+  height-offset: 0.35
+  # Whether health indicators should appear above players.
+  show-for-players: true
+  # Whether health indicators should appear above hostile monsters.
+  show-for-monsters: true
+  # Whether health indicators should appear above passive animals.
+  show-for-animals: true
+  # Whether health indicators should appear above villagers and wandering traders.
+  show-for-villagers: true
+  # Whether health indicators should appear above bosses (Withers, Wardens, Ender Dragons).
+  show-for-bosses: true
+  # If true, indicators only show when an entity has taken damage within the last few seconds.
+  show-only-when-damaged: false
+  # Seconds an indicator stays visible after damage when show-only-when-damaged is true.
+  damaged-display-seconds: 5.0
+  # Number of segments in the visual health bar.
+  bar-length: 10
+  # Symbol used for filled health segments.
+  symbol-full: "■"
+  # Symbol used for empty health segments.
+  symbol-empty: "□"
+  # Color tag for high health (>= 75%). Uses Adventure MiniMessage format.
+  color-high: "<green>"
+  # Color tag for medium health (50% - 74%).
+  color-medium: "<yellow>"
+  # Color tag for low health (25% - 49%).
+  color-low: "<gold>"
+  # Color tag for critical health (< 25%).
+  color-critical: "<red>"
+  # Color tag for empty segments in the health bar.
+  color-empty: "<dark_gray>"
+  # Indicator format for general mobs.
+  # Placeholders: <name>, <bar>, <color>, <current>, <max>, <percent>
+  format: "<name> <bar> <color><current></color><gray>/</gray><green><max></green> <red>❤</red>"
+  # Indicator format for players.
+  player-format: "<gold><name></gold> <bar> <color><current></color><gray>/</gray><green><max></green> <red>❤</red>"
+  # Indicator format for boss mobs.
+  boss-format: "<dark_purple><bold><name></bold></dark_purple> <bar> <color><current></color><gray>/</gray><green><max></green> <red>❤</red> <yellow>(<percent>%)</yellow>"
+  # Entity types that should NEVER display a health indicator.
+  blacklist:
+    - "ARMOR_STAND"
+    - "ITEM_FRAME"
+    - "GLOW_ITEM_FRAME"
+    - "MARKER"
+    - "PAINTING"
+    - "INTERACTION"
+
+# Cinematic death animation and lying corpse settings (rendered 100% via PacketEvents)
+death-animation:
+  # Master switch for the cinematic death system.
+  enabled: true
+  # Duration in seconds the entity stays lying horizontally on the ground as a corpse before vanishing.
+  # Valid range: 1.0 to 15.0. Default: 5.0.
+  corpse-duration-seconds: 5.0
+  # Whether to retain the client-side corpse lying sideways on the ground.
+  # Works by delaying the entity removal packet until the corpse duration expires.
+  enable-corpse-body: true
+  # Whether to emit ambient particles orbiting and pool-dripping around the corpse.
+  enable-ambient-particles: true
+  # Interval in ticks between ambient corpse particle pulses.
+  # Default: 4 ticks (5 times per second).
+  ambient-particle-rate-ticks: 4
+  # Whether to play a dramatic particle explosion when the corpse finally vanishes.
+  enable-final-explosion: true
+  # Whether to play cinematic sound effects during the death animation and dissipation.
+  enable-sound-effects: true
+  # Whether players also leave a lying corpse upon dying.
+  enable-for-players: true
+
+# Player-facing messages formatted using Adventure MiniMessage.
+# Legacy color codes (§ or &) are strictly forbidden.
+messages:
+  prefix: "<dark_gray>[<gradient:#FF5555:#FFAA00>MobVitals</gradient>]<reset> "
+  reloaded: "<green>Configuration and death visual profiles reloaded successfully.</green>"
+  toggled-on: "<green>Health indicators are now <bold>ENABLED</bold> for your view.</green>"
+  toggled-off: "<red>Health indicators are now <bold>DISABLED</bold> for your view.</red>"
+  status-info: "<yellow>MobVitals Status:<newline> <gray>• Active Indicators:</gray> <white><active_indicators></white><newline> <gray>• Active Corpses:</gray> <white><active_corpses></white><newline> <gray>• Tracked Viewers:</gray> <white><viewers></white>"
+  test-started: "<yellow>Executing death animation preview for profile: <gold><profile></gold> at your location.</yellow>"
+  unknown-profile: "<red>Unknown profile '<gold><profile></gold>'. Available profiles: <white><profiles></white></red>"
+  no-permission: "<red>You do not have permission to execute this command.</red>"
+  player-only: "<red>This command can only be executed by in-game players.</red>"

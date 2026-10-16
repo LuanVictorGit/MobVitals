@@ -1,0 +1,26 @@
+name: MobVitals
+version: '${project.version}'
+main: me.lhawk.mobvitals.MobVitalsPlugin
+api-version: '1.16'
+author: lHawk_
+website: https://minebuilders.com.br/discord
+description: Real-time packet-based health indicators and cinematic death animations.
+depend:
+  - packetevents
+
+commands:
+  mobvitals:
+    description: Control and configure MobVitals indicators and death animations.
+    aliases:
+      - mv
+      - vitals
+    permission: mobvitals.use
+    usage: /<command> [reload|toggle|info|test <preset>]
+
+permissions:
+  mobvitals.use:
+    description: Allows viewing and toggling MobVitals health indicators.
+    default: true
+  mobvitals.admin:
+    description: Allows reloading configuration and running administrative tests.
+    default: op
