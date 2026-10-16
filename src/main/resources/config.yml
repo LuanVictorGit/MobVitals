@@ -34,10 +34,13 @@ indicators:
   show-for-villagers: true
   # Whether health indicators should appear above bosses (Withers, Wardens, Ender Dragons).
   show-for-bosses: true
-  # If true, indicators only show when an entity has taken damage within the last few seconds.
-  show-only-when-damaged: false
-  # Seconds an indicator stays visible after damage when show-only-when-damaged is true.
-  damaged-display-seconds: 5.0
+  # If true, the main health bar appears only when an entity takes damage or heals, auto-hiding after a timeout.
+  # When false, the bar is shown continuously.
+  # Default: true.
+  show-only-when-damaged: true
+  # Seconds the main health bar stays visible after damage or healing before disappearing.
+  # Default: 4.0 seconds.
+  damaged-display-seconds: 4.0
   # Number of segments in the visual health bar.
   bar-length: 10
   # Symbol used for filled health segments.
@@ -69,22 +72,47 @@ indicators:
     - "MARKER"
     - "PAINTING"
     - "INTERACTION"
+    - "TEXT_DISPLAY"
+    - "BLOCK_DISPLAY"
+    - "ITEM_DISPLAY"
+
+# Floating damage and heal variation popups (rendered 100% via PacketEvents)
+variation-popups:
+  # Master toggle for floating damage and heal difference popups.
+  enabled: true
+  # Seconds the floating popup drifts upward before vanishing.
+  # Recommended: 1.2 to 2.5. Default: 1.8.
+  duration-seconds: 1.8
+  # Format for damage loss popups.
+  # Placeholders: <value>
+  damage-format: "<red>-<bold><value></bold> <dark_red>❤</dark_red>"
+  # Format for health recovery/regeneration popups.
+  # Placeholders: <value>
+  heal-format: "<green>+<bold><value></bold> <emerald>💚</emerald>"
+  # Minimum health change required to trigger a popup (prevents floating point jitter).
+  # Default: 0.1.
+  threshold: 0.1
 
 # Cinematic death animation and lying corpse settings (rendered 100% via PacketEvents)
 death-animation:
   # Master switch for the cinematic death system.
   enabled: true
   # Duration in seconds the entity stays lying horizontally on the ground as a corpse before vanishing.
-  # Valid range: 1.0 to 15.0. Default: 5.0.
-  corpse-duration-seconds: 5.0
+  # Valid range: 1.0 to 15.0. Default: 4.0.
+  corpse-duration-seconds: 4.0
   # Whether to retain the client-side corpse lying sideways on the ground.
   # Works by delaying the entity removal packet until the corpse duration expires.
   enable-corpse-body: true
-  # Whether to emit ambient particles orbiting and pool-dripping around the corpse.
+  # Whether to emit ambient particles centered on the corpse body.
   enable-ambient-particles: true
   # Interval in ticks between ambient corpse particle pulses.
   # Default: 4 ticks (5 times per second).
   ambient-particle-rate-ticks: 4
+  # Whether dense clusters of corpses dissipate progressively faster to prevent clutter.
+  dense-corpse-reduction: true
+  # Radius in blocks used to detect neighboring corpses for cluster dissipation.
+  # Default: 4.0 blocks.
+  dense-radius: 4.0
   # Whether to play a dramatic particle explosion when the corpse finally vanishes.
   enable-final-explosion: true
   # Whether to play cinematic sound effects during the death animation and dissipation.
@@ -98,9 +126,9 @@ messages:
   prefix: "<dark_gray>[<gradient:#FF5555:#FFAA00>MobVitals</gradient>]<reset> "
   reloaded: "<green>Configuration and death visual profiles reloaded successfully.</green>"
   toggled-on: "<green>Health indicators are now <bold>ENABLED</bold> for your view.</green>"
-  toggled-off: "<red>Health indicators are now <bold>DISABLED</bold> for your view.</red>"
-  status-info: "<yellow>MobVitals Status:<newline> <gray>• Active Indicators:</gray> <white><active_indicators></white><newline> <gray>• Active Corpses:</gray> <white><active_corpses></white><newline> <gray>• Tracked Viewers:</gray> <white><viewers></white>"
-  test-started: "<yellow>Executing death animation preview for profile: <gold><profile></gold> at your location.</yellow>"
-  unknown-profile: "<red>Unknown profile '<gold><profile></gold>'. Available profiles: <white><profiles></white></red>"
+  toggled-off: "<yellow>Health indicators are now <bold>DISABLED</bold> for your view.</yellow>"
   no-permission: "<red>You do not have permission to execute this command.</red>"
   player-only: "<red>This command can only be executed by in-game players.</red>"
+  unknown-profile: "<red>Unknown death profile '<white><profile></white>'. Available: <yellow><profiles></yellow></red>"
+  test-started: "<green>Playing cinematic death animation preview for profile <gold><profile></gold> at your position.</green>"
+  status-info: "<gradient:#FF5555:#FFAA00><bold>MobVitals Status</bold></gradient>:\n <gray>• Active Indicators:</gray> <yellow><active_indicators></yellow>\n <gray>• Active Corpses:</gray> <yellow><active_corpses></yellow>\n <gray>• Active Popups:</gray> <yellow><active_popups></yellow>\n <gray>• Tracked Viewers:</gray> <yellow><viewers></yellow>"

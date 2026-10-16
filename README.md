@@ -12,7 +12,7 @@ All visual indicators and corpse persistence are rendered on the client side wit
 ---
 
 ## 2. Current Version
-**Version:** `1.0.0`
+**Version:** `1.1.0`
 
 ---
 
@@ -45,7 +45,7 @@ mvn clean test
 mvn clean package
 ```
 
-The compiled artifact is generated at `target/MobVitals-1.0.0.jar`.
+The compiled artifact is generated at `target/MobVitals-1.1.0.jar`.
 
 ---
 
@@ -60,7 +60,7 @@ The compiled artifact is generated at `target/MobVitals-1.0.0.jar`.
 
 ### Installation Steps
 1. Download and install `packetevents-spigot-2.14.0.jar` into your server's `plugins/` folder.
-2. Place `MobVitals-1.0.0.jar` into the `plugins/` folder.
+2. Place `MobVitals-1.1.0.jar` into the `plugins/` folder.
 3. Start or reload the server (`plugman reload MobVitals` or restart).
 4. Customize options in `plugins/MobVitals/config.yml`.
 
@@ -84,7 +84,8 @@ MobVitals/
 │   │   │   │   └── DeathProfile.java
 │   │   │   ├── indicator/
 │   │   │   │   ├── HealthIndicator.java
-│   │   │   │   └── IndicatorManager.java
+│   │   │   │   ├── IndicatorManager.java
+│   │   │   │   └── VariationPopup.java
 │   │   │   ├── listener/
 │   │   │   │   ├── EntityVitalListener.java
 │   │   │   │   └── VitalPacketListener.java
@@ -98,6 +99,7 @@ MobVitals/
 │   └── test/
 │       └── java/me/lhawk/mobvitals/
 │           ├── DeathProfileTest.java
+│           ├── DenseReductionAndPopupTest.java
 │           ├── FormatTest.java
 │           ├── MetadataTest.java
 │           └── PlatformTest.java
@@ -106,13 +108,17 @@ MobVitals/
 ---
 
 ## 9. Implemented Features
-1. **Client-Side Packet Indicators:** Virtual ArmorStand holograms spawned exclusively via PacketEvents (`WrapperPlayServerSpawnEntity` and `WrapperPlayServerEntityMetadata`) using negative entity IDs.
-2. **Dynamic MiniMessage Health Bars:** Customizable symbols, fill/empty colors, 4 health tiers (High, Medium, Low, Critical), and entity name resolution.
-3. **Smooth Position Tracking:** Indicators smoothly follow host entities every tick via `WrapperPlayServerEntityTeleport` and automatically despawn when entities leave view distance or die.
-4. **Cinematic Corpse System:** Intercepts `WrapperPlayServerDestroyEntities` to delay despawn for the configured duration (default: 3.5s). The mob stays lying flat on the ground after the vanilla death tilt.
-5. **Suppressed Vanilla Death Smoke:** Intercepts entity event status 60 so the vanilla 20-tick smoke poof is hidden.
-6. **Subtle Ground-Hugging Ambient Aura:** Rings of subtle particles orbit closely around the corpse, scaled to the mob's bounding box width.
-7. **Thematic Death Profiles:** Custom particle orbits, finale dissipation blasts, and audio effects for 11 entity categories (`UNDEAD`, `SKELETAL`, `INFERNAL`, `CREEPER`, `ENDER`, `ARACHNID`, `AQUATIC`, `VILLAGER_ILLAGER`, `BOSS`, `PLAYER`, `ANIMAL`).
+1. **Hybrid Packet Visual Engine:** Automatically selects native `EntityTypes.TEXT_DISPLAY` on Minecraft 1.19.4+ through 26.2+ (billboard `CENTER`, zero collision, zero hitbox, completely pass-through and click-through) and falls back to marker ArmorStands on legacy versions (< 1.19.4).
+2. **Combat-Only Auto-Hiding Health Bar:** Overhead health indicators remain completely hidden during peaceful exploration and appear only when an entity sustains damage or heals, automatically vanishing after `damaged-display-seconds` (default: 4.0s).
+3. **Health Variation Popups:**
+   - Real-time floating damage holograms (`-<val> ❤`) with subtle upward drift (`0.032` blocks/tick) and random lateral offsets to prevent clutter.
+   - Distinct floating heal holograms (`+<val> 💚`) with identical smooth drift.
+   - Robust calculation supporting partial healing, natural regeneration, absorption hearts, and fatal damage.
+   - Coalesced 1-tick verification to prevent duplicate popups or race conditions during multi-hit ticks.
+4. **Strictly Centered Corpse Particles:** Ambient death particles emanate directly from the center of the fallen body `(x, y + bodyCenterY, z)` rather than wide orbital rings, maintaining thematic visual fidelity.
+5. **Smart Dense Corpse Reduction:** Dynamically calculates death cluster density within `dense-radius` (default: 4.0m) and scales corpse duration proportionally (from 1.0x down to 0.15x) while accelerating dissolution of older corpses in the pile to eliminate clutter.
+6. **Smooth Dissolution Animation:** Expiring corpses burst into thematic finale particles and custom audio before the client destroys the entity, guaranteeing no abrupt visual cuts or lingering ghost models.
+7. **Thematic Death Profiles:** Custom particle and sound profiles for 11 entity categories (`UNDEAD`, `SKELETAL`, `INFERNAL`, `CREEPER`, `ENDER`, `ARACHNID`, `AQUATIC`, `VILLAGER_ILLAGER`, `BOSS`, `PLAYER`, `ANIMAL`).
 8. **Client Visibility Toggle:** Individual players can toggle health indicators on/off with `/mobvitals toggle`.
 
 ---
@@ -122,71 +128,64 @@ MobVitals/
 | :--- | :--- | :--- |
 | `/mobvitals toggle` | `mobvitals.use` (default: all) | Toggles personal visibility of health indicators. |
 | `/mobvitals reload` | `mobvitals.admin` (default: op) | Reloads `config.yml` settings. |
-| `/mobvitals info` | `mobvitals.admin` (default: op) | Displays active indicator count, active corpses, and tracking stats. |
+| `/mobvitals info` | `mobvitals.admin` (default: op) | Displays active indicator count, active popups, active corpses, and tracking stats. |
 | `/mobvitals test <profile>` | `mobvitals.admin` (default: op) | Spawns preview particles and sounds of a death profile at the player's location. |
 
-Aliases: `/mv`
+Aliases: `/mv`, `/vitals`
 
 ---
 
 ## 11. Configuration Overview
 The `config.yml` file contains full English explanations for every option:
 - `indicators.enabled`: Global toggle for floating indicators.
-- `indicators.view-distance`: Radius in blocks for rendering indicators (default: 32).
-- `indicators.height-offset`: Vertical offset above entity head (default: 0.25).
-- `indicators.bar-length`: Total segments in the health bar (default: 10).
-- `death-animations.corpse-duration-seconds`: Time in seconds corpses remain lying down (default: 3.5).
-- `death-animations.ambient-particles`: Toggles the subtle ground orbit aura.
-- `death-animations.final-explosion`: Toggles the dissipation effect when the corpse timer expires.
-- `entity-filters`: Independent toggles for players, monsters, animals, villagers, and bosses, with an entity type blacklist.
+- `indicators.show-only-when-damaged`: Auto-hides overhead health bars until damaged/healed.
+- `indicators.damaged-display-seconds`: Duration in seconds overhead bars remain visible.
+- `indicators.variation-popups`: Floating damage/heal difference popups toggle and formatting.
+- `death-animations.dense-corpse-reduction`: Enables smart duration reduction for clustered deaths.
+- `death-animations.dense-radius`: Radius in blocks to detect corpse clusters.
+- `death-animations.corpse-duration-seconds`: Base time corpses remain lying down.
+- `death-animations.ambient-particles`: Ambient body-centered particle aura.
+- `death-animations.final-explosion`: Dissolution particle burst.
 
 ---
 
 ## 12. Development and Testing Instructions
 1. Run automated unit tests:
    ```bash
-   mvn test
+   mvn clean test
    ```
-2. Build the JAR:
+2. Build the shaded production JAR:
    ```bash
    mvn clean package
    ```
-3. Copy to test server and reload:
+3. Deploy to test server:
    ```bash
-   Copy-Item target/MobVitals-1.0.0.jar c:/Users/.../servidor/plugins/ -Force
-   # In server console:
+   Copy-Item target/MobVitals-1.1.0.jar c:/Users/.../servidor/plugins/ -Force
    plugman reload MobVitals
    ```
-4. Verify console logs for:
-   `[MobVitals] PacketEvents detected: Packet-based indicators and corpse visuals activated.`
 
 ---
 
 ## 13. Known Limitations and Design Decisions
-- **ArmorStand Hologram Choice:** Uses virtual small marker ArmorStands for maximum backwards compatibility (1.16.5 through 26.2+). `TEXT_DISPLAY` entities are only supported in 1.19.4+ and would break 1.16.5-1.19.2 support.
-- **Authoritative Combat State:** Damage and death events remain strictly managed by Spigot/Paper server events to guarantee data integrity; PacketEvents is used exclusively for client rendering and packet interception.
+- **TextDisplay Modern Choice:** Leverages `EntityTypes.TEXT_DISPLAY` on 1.19.4+ / 26.2 to completely prevent wooden armor stand models, eliminate raycast blocking, and guarantee zero collision with player attacks.
+- **Packet Interception Lifecycle:** When a corpse expires, the delayed destroy flag is removed *prior* to broadcasting the destroy packet, ensuring `VitalPacketListener` does not intercept the genuine cleanup packet.
+- **Purely Virtual Entities:** Zero physical entities are ever spawned on the server; all visuals are packet-driven via PacketEvents.
 
 ---
 
-## 14. Important Compatibility Decisions
-- **Adventure Component Shading:** Adventure classes (`net.kyori`) are shaded into the JAR *without* relocation patterns, allowing PacketEvents' `EntityDataTypes.OPTIONAL_ADV_COMPONENT` to directly serialize components without class-casting mismatches.
-- **Metadata Index Switching:** ArmorStand client flags are dynamically sent to index 14 on Minecraft < 1.17, and index 15 on Minecraft 1.17 - 26.2+.
-- **Weak References:** Host entities in `HealthIndicator` are wrapped in `WeakReference<LivingEntity>` to avoid holding stale references across world unloads or chunk resets.
-
----
-
-## 15. Version History
+## 14. Version History
+- **1.1.0 (2026-10-16):**
+  - Switched visual rendering engine to native `EntityTypes.TEXT_DISPLAY` on 1.19.4+ / 26.2, eliminating ArmorStand mannequins and physical raycast blocking.
+  - Implemented health variation popups (`-<val> ❤` damage and `+<val> 💚` heal) with drift animation, absorption hearts support, and fatal damage handling.
+  - Added smart dense corpse reduction system to prevent piling of dead bodies.
+  - Centered corpse ambient particles strictly over the fallen body.
+  - Fixed corpse destroy packet interception race condition.
 - **1.0.0 (2026-10-16):**
-  - Initial production release.
-  - Full PacketEvents virtual health indicators with MiniMessage styling.
-  - Lying corpse delay animation with vanilla poof suppression.
-  - Entity-category visual/sound profiles.
-  - Paper, Spigot, and Folia cross-platform compatibility.
+  - Initial release with PacketEvents health indicators and lying corpse animations.
 
 ---
 
-## 16. Important Implementation Constraints
-Future contributors and AI pair programmers must preserve:
+## 15. Important Implementation Constraints
 1. **Zero comments in source code:** `.java` files must never contain comments or JavaDoc.
 2. **Adventure MiniMessage exclusively:** Never use legacy section `§` or ampersand `&` color formatting.
 3. **Folia safety:** Use `Schedulers` abstraction for all tasks and player/entity operations.

@@ -28,6 +28,18 @@ public final class Platform {
         return packetEvents;
     }
 
+    public static boolean isTextDisplaySupported() {
+        if (!hasPacketEvents()) return false;
+        try {
+            return com.github.retrooper.packetevents.PacketEvents.getAPI()
+                    .getServerManager()
+                    .getVersion()
+                    .isNewerThanOrEquals(com.github.retrooper.packetevents.manager.server.ServerVersion.V_1_19_4);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
     public static void resetForTests() {
         folia = null;
         packetEvents = null;

@@ -11,6 +11,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
+import org.bukkit.event.entity.EntitySpawnEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.plugin.Plugin;
@@ -29,30 +30,29 @@ public final class EntityVitalListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEntityDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof LivingEntity living) {
-            Schedulers.later(plugin, 1L, () -> {
-                if (living.isValid() && !living.isDead() && living.getHealth() > 0) {
-                    indicatorManager.onEntityDamageOrHeal(living);
-                }
-            });
+            indicatorManager.onDamageEvent(living);
         }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEntityRegainHealth(EntityRegainHealthEvent event) {
         if (event.getEntity() instanceof LivingEntity living) {
-            Schedulers.later(plugin, 1L, () -> {
-                if (living.isValid() && !living.isDead() && living.getHealth() > 0) {
-                    indicatorManager.onEntityDamageOrHeal(living);
-                }
-            });
+            indicatorManager.onRegainHealthEvent(living);
         }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onEntityDeath(EntityDeathEvent event) {
         LivingEntity living = event.getEntity();
-        indicatorManager.removeEntity(living.getEntityId());
+        indicatorManager.handleEntityDeath(living);
         corpseManager.onEntityDeath(living);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onEntitySpawn(EntitySpawnEvent event) {
+        if (event.getEntity() instanceof LivingEntity living) {
+            indicatorManager.recordEntityHealth(living);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -60,7 +60,8 @@ public final class EntityVitalListener implements Listener {
         Player player = event.getPlayer();
         Schedulers.later(plugin, 2L, () -> {
             if (player.isOnline()) {
-                indicatorManager.onEntityDamageOrHeal(player);
+                indicatorManager.recordEntityHealth(player);
+                indicatorManager.handleHealthChange(player);
             }
         });
     }

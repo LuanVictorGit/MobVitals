@@ -17,8 +17,10 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -32,7 +34,7 @@ public final class CorpseManager {
         private final DeathProfile profile;
         private final double entityWidth;
         private final double entityHeight;
-        private final long expireTimeMillis;
+        private volatile long expireTimeMillis;
         private final Set<UUID> viewers;
         private int tickCounter;
 
@@ -71,6 +73,10 @@ public final class CorpseManager {
             return expireTimeMillis;
         }
 
+        public void setExpireTimeMillis(long expireTimeMillis) {
+            this.expireTimeMillis = expireTimeMillis;
+        }
+
         public Set<UUID> getViewers() {
             return viewers;
         }
@@ -106,11 +112,11 @@ public final class CorpseManager {
             tickTask.cancel();
             tickTask = null;
         }
+        delayedDestroyIds.clear();
         for (CorpseSession session : activeCorpses.values()) {
             sendDestroyToViewers(session);
         }
         activeCorpses.clear();
-        delayedDestroyIds.clear();
     }
 
     public boolean isDelayedDestroy(int entityId) {
@@ -127,7 +133,40 @@ public final class CorpseManager {
 
         DeathProfile profile = DeathProfile.fromEntity(entity);
         long durationMs = (long) (config.getCorpseDurationSeconds() * 1000.0);
-        long expireTime = System.currentTimeMillis() + durationMs;
+        long now = System.currentTimeMillis();
+
+        if (config.isDenseCorpseReduction()) {
+            double radiusSq = config.getDenseRadius() * config.getDenseRadius();
+            List<CorpseSession> cluster = new ArrayList<>();
+            for (CorpseSession s : activeCorpses.values()) {
+                if (s.getLocation().getWorld() == loc.getWorld() && s.getLocation().distanceSquared(loc) <= radiusSq) {
+                    cluster.add(s);
+                }
+            }
+            int count = cluster.size();
+            if (count > 0) {
+                double factor;
+                if (count == 1) {
+                    factor = 0.70;
+                } else if (count == 2) {
+                    factor = 0.50;
+                } else if (count == 3) {
+                    factor = 0.35;
+                } else {
+                    factor = Math.max(0.15, 1.0 / (count + 1));
+                }
+                long scaled = Math.max(800L, (long) (durationMs * factor));
+                durationMs = scaled;
+                for (CorpseSession neighbor : cluster) {
+                    long remaining = neighbor.getExpireTimeMillis() - now;
+                    if (remaining > scaled) {
+                        neighbor.setExpireTimeMillis(now + scaled);
+                    }
+                }
+            }
+        }
+
+        long expireTime = now + durationMs;
 
         double viewDistSq = config.getViewDistance() * config.getViewDistance();
         Set<UUID> viewers = new HashSet<>();
@@ -166,10 +205,17 @@ public final class CorpseManager {
             int entityId = entry.getKey();
             CorpseSession session = entry.getValue();
 
-            if (now >= session.getExpireTimeMillis()) {
-                finishCorpse(session);
-                activeCorpses.remove(entityId);
+            Location loc = session.getLocation();
+            World world = loc.getWorld();
+            if (world == null || !world.isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) {
                 delayedDestroyIds.remove(entityId);
+                activeCorpses.remove(entityId);
+                continue;
+            }
+
+            if (now >= session.getExpireTimeMillis()) {
+                activeCorpses.remove(entityId);
+                finishCorpse(session);
                 continue;
             }
 
@@ -188,24 +234,20 @@ public final class CorpseManager {
         DeathProfile profile = session.getProfile();
         int step = session.getTickCounter();
 
-        double radius = Math.max(0.22, Math.min(0.9, session.getEntityWidth() * 0.55));
-        double angle = step * 0.5;
-        double px = loc.getX() + radius * Math.cos(angle);
-        double pz = loc.getZ() + radius * Math.sin(angle);
-        double py = loc.getY() + 0.08;
+        double bodyCenterY = Math.max(0.08, Math.min(0.20, session.getEntityWidth() * 0.3));
+        double cx = loc.getX();
+        double cy = loc.getY() + bodyCenterY;
+        double cz = loc.getZ();
 
         String[] particles = profile.getAmbientParticles();
         if (particles.length > 0) {
             String pName = particles[step % particles.length];
-            sendParticleToViewers(session, pName, px, py, pz, 1, 0.02f, 0.02f, 0.02f, 0.01f);
+            sendParticleToViewers(session, pName, cx, cy, cz, 1, 0.05f, 0.04f, 0.05f, 0.01f);
         }
 
-        double dropX = loc.getX() + (Math.sin(step) * radius * 0.4);
-        double dropZ = loc.getZ() + (Math.cos(step) * radius * 0.4);
-        double dropY = loc.getY() + 0.05;
         if (particles.length > 1) {
             String second = particles[(step + 1) % particles.length];
-            sendParticleToViewers(session, second, dropX, dropY, dropZ, 1, 0.02f, 0.02f, 0.02f, 0.01f);
+            sendParticleToViewers(session, second, cx, cy, cz, 1, 0.04f, 0.03f, 0.04f, 0.01f);
         }
 
         if (step % 30 == 0 && config.isEnableSoundEffects()) {
@@ -219,6 +261,9 @@ public final class CorpseManager {
     }
 
     private void finishCorpse(CorpseSession session) {
+        int entityId = session.getEntityId();
+        delayedDestroyIds.remove(entityId);
+
         Location loc = session.getLocation();
         DeathProfile profile = session.getProfile();
         double radius = Math.max(0.25, Math.min(0.9, session.getEntityWidth() * 0.55));

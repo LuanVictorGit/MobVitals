@@ -73,6 +73,7 @@ public final class MobVitalsCommand implements CommandExecutor, TabCompleter {
                 String info = config.getMsgStatusInfo()
                         .replace("<active_indicators>", String.valueOf(indicatorManager.getActiveIndicatorCount()))
                         .replace("<active_corpses>", String.valueOf(corpseManager.getActiveCorpseCount()))
+                        .replace("<active_popups>", String.valueOf(indicatorManager.getActivePopupCount()))
                         .replace("<viewers>", String.valueOf(indicatorManager.getTrackedViewersCount()));
                 TextUtil.sendMessage(sender, info);
                 return true;

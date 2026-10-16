@@ -38,11 +38,19 @@ public final class PluginConfig {
     private String bossFormat;
     private Set<String> blacklist = new HashSet<>();
 
+    private boolean popupsEnabled;
+    private double popupDurationSeconds;
+    private String damageFormat;
+    private String healFormat;
+    private double popupThreshold;
+
     private boolean deathAnimationEnabled;
     private double corpseDurationSeconds;
     private boolean enableCorpseBody;
     private boolean enableAmbientParticles;
     private long ambientParticleRateTicks;
+    private boolean denseCorpseReduction;
+    private double denseRadius;
     private boolean enableFinalExplosion;
     private boolean enableSoundEffects;
     private boolean enableForPlayers;
@@ -99,11 +107,19 @@ public final class PluginConfig {
             }
         }
 
+        popupsEnabled = config.getBoolean("variation-popups.enabled", true);
+        popupDurationSeconds = Math.max(0.5, Math.min(10.0, config.getDouble("variation-popups.duration-seconds", 1.8)));
+        damageFormat = config.getString("variation-popups.damage-format", "<red>-<bold><value></bold> <dark_red>❤</dark_red>");
+        healFormat = config.getString("variation-popups.heal-format", "<green>+<bold><value></bold> <emerald>💚</emerald>");
+        popupThreshold = Math.max(0.01, config.getDouble("variation-popups.threshold", 0.1));
+
         deathAnimationEnabled = config.getBoolean("death-animation.enabled", true);
-        corpseDurationSeconds = Math.max(1.0, Math.min(30.0, config.getDouble("death-animation.corpse-duration-seconds", 5.0)));
+        corpseDurationSeconds = Math.max(1.0, Math.min(30.0, config.getDouble("death-animation.corpse-duration-seconds", 4.0)));
         enableCorpseBody = config.getBoolean("death-animation.enable-corpse-body", true);
         enableAmbientParticles = config.getBoolean("death-animation.enable-ambient-particles", true);
         ambientParticleRateTicks = Math.max(1, config.getLong("death-animation.ambient-particle-rate-ticks", 4));
+        denseCorpseReduction = config.getBoolean("death-animation.dense-corpse-reduction", true);
+        denseRadius = Math.max(1.0, config.getDouble("death-animation.dense-radius", 4.0));
         enableFinalExplosion = config.getBoolean("death-animation.enable-final-explosion", true);
         enableSoundEffects = config.getBoolean("death-animation.enable-sound-effects", true);
         enableForPlayers = config.getBoolean("death-animation.enable-for-players", true);
@@ -245,6 +261,34 @@ public final class PluginConfig {
 
     public boolean isEnableForPlayers() {
         return enableForPlayers;
+    }
+
+    public boolean isPopupsEnabled() {
+        return popupsEnabled;
+    }
+
+    public double getPopupDurationSeconds() {
+        return popupDurationSeconds;
+    }
+
+    public String getDamageFormat() {
+        return damageFormat;
+    }
+
+    public String getHealFormat() {
+        return healFormat;
+    }
+
+    public double getPopupThreshold() {
+        return popupThreshold;
+    }
+
+    public boolean isDenseCorpseReduction() {
+        return denseCorpseReduction;
+    }
+
+    public double getDenseRadius() {
+        return denseRadius;
     }
 
     public String getMsgPrefix() {
