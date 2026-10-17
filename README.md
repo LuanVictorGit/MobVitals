@@ -167,14 +167,30 @@ The `config.yml` file contains full English explanations for every option:
 
 ---
 
-## 13. Known Limitations and Design Decisions
+## 13. In-Game Verification and Screenshots
+The plugin includes authentic in-game verification captures stored in [`screenshots/`](screenshots/):
+- `01_health_indicator_zombie.png`: High-visibility health indicator above hostile mob.
+- `02_health_indicator_combat.png`: Real-time health bar tracking during active combat.
+- `03_damage_popups.png`: Instant floating damage popups (`-❤`) on normal strikes.
+- `04_floating_variation_popups.png`: Consecutive hit variation popups with smooth upward drift.
+- `05_corpse_death_animation.png`: Natural sideways falling animation upon lethal blow.
+- `06_corpse_ambient_particles.png`: Thematic ambient particle wisps centered on the fallen body.
+- `07_corpse_ground_alignment.png`: Ground-anchored corpse position synchronized at 2 ticks and 5 ticks.
+- `08_corpse_particle_wisps.png`: Sustained visual effect without red hurt damage overlay.
+- `09_corpse_ragdoll_prone.png`: Natural prone death pose preserving entity textures and colors.
+- `10_corpse_terrain_stability.png`: Stability and collision isolation on uneven terrain.
+- `11_corpse_final_dissipation.png`: Thematic particle explosion upon corpse decay.
+
+---
+
+## 14. Known Limitations and Design Decisions
 - **Intangible Marker ArmorStands:** Virtual marker ArmorStands provide universal cross-version nametag rendering across 1.16.5–26.2+. Because Marker (`0x10`) gives a 0x0x0 bounding box, players and projectiles pass right through with zero physical collision.
 - **Packet Interception Lifecycle:** When a corpse expires, the delayed destroy flag is removed *prior* to broadcasting the destroy packet, ensuring `VitalPacketListener` does not intercept the genuine cleanup packet.
 - **Purely Virtual Entities:** Zero physical entities are ever spawned on the server; all visuals are packet-driven via PacketEvents.
 
 ---
 
-## 14. Version History
+## 15. Version History
 - **1.0.5 (2026-10-17):**
   - Enhanced death animation flow: permitted natural death event packets (status 3) during the initial 2 ticks (~100 ms) so mob bodies naturally tilt and lie flat on the ground.
   - Anchored corpse ground teleportation at 2 ticks with a 5-tick (~250 ms) stability re-confirmation directly at ambient particle coordinates, removing the red damage overlay.
@@ -198,7 +214,7 @@ The `config.yml` file contains full English explanations for every option:
 
 ---
 
-## 15. Important Implementation Constraints
+## 16. Important Implementation Constraints
 1. **Zero comments in source code:** `.java` files must never contain comments or JavaDoc.
 2. **Adventure MiniMessage exclusively:** Never use legacy section `§` or ampersand `&` color formatting.
 3. **Folia safety:** Use `Schedulers` abstraction for all tasks and player/entity operations.
