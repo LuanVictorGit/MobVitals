@@ -15,17 +15,16 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityVelocity;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerParticle;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
 import me.lhawk.mobvitals.config.PluginConfig;
 import me.lhawk.mobvitals.util.Platform;
 import me.lhawk.mobvitals.util.Schedulers;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -48,7 +47,7 @@ public final class CorpseManager {
         private volatile long expireTimeMillis;
         private final Set<UUID> viewers;
         private int tickCounter;
-        private boolean teleportedAt5Ticks;
+        private boolean teleported;
 
         public CorpseSession(int entityId, UUID entityUuid, Location location, DeathProfile profile, double entityWidth, double entityHeight, long expireTimeMillis, Set<UUID> viewers) {
             this.entityId = entityId;
@@ -60,7 +59,7 @@ public final class CorpseManager {
             this.expireTimeMillis = expireTimeMillis;
             this.viewers = viewers;
             this.tickCounter = 0;
-            this.teleportedAt5Ticks = false;
+            this.teleported = false;
         }
 
         public int getEntityId() {
@@ -107,12 +106,12 @@ public final class CorpseManager {
             this.tickCounter++;
         }
 
-        public boolean isTeleportedAt5Ticks() {
-            return teleportedAt5Ticks;
+        public boolean isTeleported() {
+            return teleported;
         }
 
-        public void setTeleportedAt5Ticks(boolean teleportedAt5Ticks) {
-            this.teleportedAt5Ticks = teleportedAt5Ticks;
+        public void setTeleported(boolean teleported) {
+            this.teleported = teleported;
         }
     }
 
@@ -120,8 +119,8 @@ public final class CorpseManager {
     private final PluginConfig config;
     private final Map<Integer, CorpseSession> activeCorpses = new ConcurrentHashMap<>();
     private final Set<Integer> delayedDestroyIds = ConcurrentHashMap.newKeySet();
-    private final Set<UUID> initializedTeamPlayers = ConcurrentHashMap.newKeySet();
     private Schedulers.TaskHandle tickTask;
+    private Team corpseTeam;
 
     public CorpseManager(Plugin plugin, PluginConfig config) {
         this.plugin = plugin;
@@ -130,6 +129,7 @@ public final class CorpseManager {
 
     public void start() {
         stop();
+        initScoreboardTeam();
         long period = config.getAmbientParticleRateTicks();
         tickTask = Schedulers.timer(plugin, 2L, period, this::tick);
     }
@@ -144,13 +144,48 @@ public final class CorpseManager {
             sendDestroyToViewers(session);
         }
         activeCorpses.clear();
-        initializedTeamPlayers.clear();
+        if (corpseTeam != null) {
+            try {
+                corpseTeam.unregister();
+            } catch (Throwable ignored) {}
+            corpseTeam = null;
+        }
+    }
+
+    private void initScoreboardTeam() {
+        try {
+            Scoreboard sb = plugin.getServer().getScoreboardManager().getMainScoreboard();
+            Team t = sb.getTeam("mv_corpse");
+            if (t == null) {
+                t = sb.registerNewTeam("mv_corpse");
+            }
+            t.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
+            t.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.NEVER);
+            this.corpseTeam = t;
+        } catch (Throwable ignored) {}
+    }
+
+    private void addCorpseToTeam(UUID uuid) {
+        if (corpseTeam != null && uuid != null) {
+            try {
+                corpseTeam.addEntry(uuid.toString());
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    private void removeCorpseFromTeam(UUID uuid) {
+        if (corpseTeam != null && uuid != null) {
+            try {
+                corpseTeam.removeEntry(uuid.toString());
+            } catch (Throwable ignored) {}
+        }
     }
 
     public void removeCorpse(int entityId) {
         delayedDestroyIds.remove(entityId);
         CorpseSession session = activeCorpses.remove(entityId);
         if (session != null) {
+            removeCorpseFromTeam(session.getEntityUuid());
             sendDestroyToViewers(session);
         }
     }
@@ -219,6 +254,7 @@ public final class CorpseManager {
         boolean isPlayer = entity instanceof Player;
         if (config.isEnableCorpseBody() && !isPlayer) {
             delayedDestroyIds.add(entityId);
+            addCorpseToTeam(entityUuid);
         }
 
         double width = Math.max(0.3, entity.getWidth());
@@ -228,9 +264,9 @@ public final class CorpseManager {
 
         if (config.isEnableCorpseBody() && !isPlayer) {
             sendCorpseStateToViewers(session);
-            Schedulers.later(plugin, 5L, () -> {
+            Schedulers.later(plugin, 1L, () -> {
                 if (activeCorpses.containsKey(entityId)) {
-                    session.setTeleportedAt5Ticks(true);
+                    session.setTeleported(true);
                     teleportCorpseToGround(session);
                 }
             });
@@ -259,6 +295,7 @@ public final class CorpseManager {
             if (world == null || !world.isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) {
                 delayedDestroyIds.remove(entityId);
                 activeCorpses.remove(entityId);
+                removeCorpseFromTeam(session.getEntityUuid());
                 sendDestroyToViewers(session);
                 continue;
             }
@@ -359,6 +396,7 @@ public final class CorpseManager {
     private void finishCorpse(CorpseSession session) {
         int entityId = session.getEntityId();
         delayedDestroyIds.remove(entityId);
+        removeCorpseFromTeam(session.getEntityUuid());
 
         Location loc = session.getLocation();
         DeathProfile profile = session.getProfile();
@@ -393,30 +431,6 @@ public final class CorpseManager {
         sendDestroyToViewers(session);
     }
 
-    private void ensureCorpseTeam(Player player) {
-        if (!Platform.hasPacketEvents() || player == null || !player.isOnline()) return;
-        if (initializedTeamPlayers.add(player.getUniqueId())) {
-            WrapperPlayServerTeams.ScoreBoardTeamInfo info = new WrapperPlayServerTeams.ScoreBoardTeamInfo(
-                    Component.text("mv_corpse"),
-                    Component.empty(),
-                    Component.empty(),
-                    WrapperPlayServerTeams.NameTagVisibility.NEVER,
-                    WrapperPlayServerTeams.CollisionRule.NEVER,
-                    NamedTextColor.WHITE,
-                    WrapperPlayServerTeams.OptionData.NONE
-            );
-            WrapperPlayServerTeams createTeam = new WrapperPlayServerTeams(
-                    "mv_corpse",
-                    WrapperPlayServerTeams.TeamMode.CREATE,
-                    info,
-                    Collections.emptyList()
-            );
-            try {
-                PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, createTeam);
-            } catch (Throwable ignored) {}
-        }
-    }
-
     private void sendCorpseStateToViewers(CorpseSession session) {
         if (!Platform.hasPacketEvents()) return;
         for (UUID uid : session.getViewers()) {
@@ -432,18 +446,6 @@ public final class CorpseManager {
         int entityId = session.getEntityId();
         if (player.getEntityId() == entityId) return;
         if (session.getProfile().isPlayer()) return;
-
-        ensureCorpseTeam(player);
-        String entry = session.getEntityUuid() != null ? session.getEntityUuid().toString() : String.valueOf(entityId);
-        WrapperPlayServerTeams addEntity = new WrapperPlayServerTeams(
-                "mv_corpse",
-                WrapperPlayServerTeams.TeamMode.ADD_ENTITIES,
-                (WrapperPlayServerTeams.ScoreBoardTeamInfo) null,
-                Collections.singletonList(entry)
-        );
-        try {
-            PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, addEntity);
-        } catch (Throwable ignored) {}
 
         int healthIndex = 9;
         try {
@@ -470,13 +472,6 @@ public final class CorpseManager {
     private void sendDestroyToViewers(CorpseSession session) {
         if (!Platform.hasPacketEvents() || session.getProfile().isPlayer()) return;
         WrapperPlayServerDestroyEntities destroy = new WrapperPlayServerDestroyEntities(session.getEntityId());
-        String entry = session.getEntityUuid() != null ? session.getEntityUuid().toString() : String.valueOf(session.getEntityId());
-        WrapperPlayServerTeams removeEntity = new WrapperPlayServerTeams(
-                "mv_corpse",
-                WrapperPlayServerTeams.TeamMode.REMOVE_ENTITIES,
-                (WrapperPlayServerTeams.ScoreBoardTeamInfo) null,
-                Collections.singletonList(entry)
-        );
 
         Set<Player> targets = new HashSet<>();
         for (UUID uid : session.getViewers()) {
@@ -496,7 +491,6 @@ public final class CorpseManager {
         for (Player p : targets) {
             if (p.getEntityId() != session.getEntityId()) {
                 try {
-                    PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, removeEntity);
                     PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, destroy);
                 } catch (Throwable ignored) {}
             }
