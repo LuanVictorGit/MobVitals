@@ -22,6 +22,11 @@
   <li><strong>Multi-Platform &amp; Folia Ready:</strong> Native support for Paper, Spigot, Purpur, and Folia region threading without race conditions or main-thread hitching.</li>
 </ul>
 
+<h3>Changelog v1.0.3</h3>
+<ul>
+  <li><strong>Ajuste Rápido de Âncora (5 Ticks):</strong> Reduzido o tempo de teleporte e ancoragem do corpo morto de 10 ticks para apenas 5 ticks (0.25s) via agendamento direto, alinhando o corpo instantaneamente com as partículas ambientes.</li>
+</ul>
+
 <h3>Changelog v1.0.2</h3>
 <ul>
   <li><strong>1-Tick Damage Synchronization:</strong> Health updates and popups are now processed after 1 tick to reflect Bukkit's exact post-damage health calculation.</li>

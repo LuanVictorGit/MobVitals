@@ -48,7 +48,7 @@ public final class CorpseManager {
         private volatile long expireTimeMillis;
         private final Set<UUID> viewers;
         private int tickCounter;
-        private boolean teleportedAt10Ticks;
+        private boolean teleportedAt5Ticks;
 
         public CorpseSession(int entityId, UUID entityUuid, Location location, DeathProfile profile, double entityWidth, double entityHeight, long expireTimeMillis, Set<UUID> viewers) {
             this.entityId = entityId;
@@ -60,7 +60,7 @@ public final class CorpseManager {
             this.expireTimeMillis = expireTimeMillis;
             this.viewers = viewers;
             this.tickCounter = 0;
-            this.teleportedAt10Ticks = false;
+            this.teleportedAt5Ticks = false;
         }
 
         public int getEntityId() {
@@ -107,12 +107,12 @@ public final class CorpseManager {
             this.tickCounter++;
         }
 
-        public boolean isTeleportedAt10Ticks() {
-            return teleportedAt10Ticks;
+        public boolean isTeleportedAt5Ticks() {
+            return teleportedAt5Ticks;
         }
 
-        public void setTeleportedAt10Ticks(boolean teleportedAt10Ticks) {
-            this.teleportedAt10Ticks = teleportedAt10Ticks;
+        public void setTeleportedAt5Ticks(boolean teleportedAt5Ticks) {
+            this.teleportedAt5Ticks = teleportedAt5Ticks;
         }
     }
 
@@ -228,6 +228,12 @@ public final class CorpseManager {
 
         if (config.isEnableCorpseBody() && !isPlayer) {
             sendCorpseStateToViewers(session);
+            Schedulers.later(plugin, 5L, () -> {
+                if (activeCorpses.containsKey(entityId)) {
+                    session.setTeleportedAt5Ticks(true);
+                    teleportCorpseToGround(session);
+                }
+            });
         }
 
         if (config.isEnableSoundEffects()) {
@@ -276,11 +282,6 @@ public final class CorpseManager {
             }
 
             session.incrementTick();
-            if (session.getTickCounter() >= 10 && !session.isTeleportedAt10Ticks()) {
-                session.setTeleportedAt10Ticks(true);
-                teleportCorpseToGround(session);
-            }
-
             if (config.isEnableAmbientParticles()) {
                 renderAmbient(session);
             }
