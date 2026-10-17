@@ -22,9 +22,14 @@
   <li><strong>Multi-Platform &amp; Folia Ready:</strong> Native support for Paper, Spigot, Purpur, and Folia region threading without race conditions or main-thread hitching.</li>
 </ul>
 
+<h3>Changelog v1.0.4</h3>
+<ul>
+  <li><strong>Teleporte de Posição 1.21.2+ / 26.2 (EntityPositionSync):</strong> Implementada a sincronização de posição através do pacote moderno <code>ClientboundEntityPositionSyncPacket</code> após exatamente 1 tick da morte. Isso corrige em definitivo o teleporte do corpo para o local de nascimento das partículas no Minecraft 1.21.2+, eliminando o desvio causado por knockback anterior.</li>
+</ul>
+
 <h3>Changelog v1.0.3</h3>
 <ul>
-  <li><strong>Ajuste Rápido de Âncora (5 Ticks):</strong> Reduzido o tempo de teleporte e ancoragem do corpo morto de 10 ticks para apenas 5 ticks (0.25s) via agendamento direto, alinhando o corpo instantaneamente com as partículas ambientes.</li>
+  <li><strong>Isolamento de Colisão &amp; Âncora Rápida:</strong> Aplicação nativa de regra de colisão no scoreboard para evitar empurrões no jogador e alinhamento de estado de corpo.</li>
 </ul>
 
 <h3>Changelog v1.0.2</h3>

@@ -12,12 +12,12 @@ All visual indicators and corpse persistence are rendered on the client side wit
 ---
 
 ## 2. Current Version
-**Version:** `1.0.3`
+**Version:** `1.0.4`
 
 ---
 
 ## 3. Project Status
-**Status:** `Active / Published on MineBuilders (v1.0.3)`
+**Status:** `Active / Published on MineBuilders (v1.0.4)`
 **MineBuilders Slug:** `mobvitals-health-corpses-1-16-26-3`
 **MineBuilders ID:** `cdf014fb-8da6-4fa2-8ab3-7978fe9aea61`
 
@@ -175,6 +175,16 @@ The `config.yml` file contains full English explanations for every option:
 ---
 
 ## 14. Version History
+- **1.0.4 (2026-10-16):**
+  - Implemented modern Minecraft 1.21.2+ / 26.2 `WrapperPlayServerEntityPositionSync` (`ClientboundEntityPositionSyncPacket`) support to accurately teleport dead mob bodies directly onto their particle spawn anchors after 1 tick.
+  - Zeroed delta movement and ensured `onGround = true` with client-side sleep poses, removing visual desync and residual knockback drift.
+- **1.0.3 (2026-10-16):**
+  - Fast 1-tick delayed corpse ground positioning and collision isolation using native Bukkit scoreboard team rules.
+- **1.0.2 (2026-10-16):**
+  - 1-tick damage synchronization for healthbars to match Bukkit final damage.
+  - Suppressed permanent red hurt animation on corpse bodies and hidden self-indicators for players.
+- **1.0.1 (2026-10-16):**
+  - Enhanced healthbar visualization with high-visibility segmented battery bars and MiniMessage color gradient styling.
 - **1.0.0 (2026-10-16):**
   - Initial release with PacketEvents real-time health indicators, floating damage/heal popups, and cinematic lying corpse animations.
   - Implemented smart dense corpse reduction and centered corpse ambient particles.

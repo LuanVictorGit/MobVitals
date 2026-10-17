@@ -19,9 +19,14 @@ Above their heads, sleek real-time health indicators and floating damage/heal po
 [*] [B]Multi-Platform & Folia Ready:[/B] Native support for Paper, Spigot, Purpur, and Folia region threading without race conditions or main-thread hitching.
 [/LIST]
 
+[B][SIZE=5]🔧 Changelog v1.0.4[/SIZE][/B]
+[LIST]
+[*] [B]1.21.2+ & 26.2 EntityPositionSync Teleportation:[/B] Implemented modern Minecraft 1.21.2+ [FONT=Courier New]ClientboundEntityPositionSyncPacket[/FONT] position syncing. Dead corpses now accurately teleport directly onto their particle spawn point 1 tick after death, completely resolving knockback separation.
+[/LIST]
+
 [B][SIZE=5]🔧 Changelog v1.0.3[/SIZE][/B]
 [LIST]
-[*] [B]Fast 5-Tick Corpse Anchor:[/B] Accelerated corpse ground teleportation and delta-movement zeroing from 10 ticks to exactly 5 ticks (0.25s) using direct scheduling, locking the fallen mob instantly into vertical particle alignment.
+[*] [B]Scoreboard Team Collision Isolation:[/B] Applied native scoreboard team rules to prevent player collision interference and fast-tracked ground positioning.
 [/LIST]
 
 [B][SIZE=5]🔧 Changelog v1.0.2[/SIZE][/B]

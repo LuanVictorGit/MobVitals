@@ -2,6 +2,7 @@ package me.lhawk.mobvitals.death;
 
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
+import com.github.retrooper.packetevents.protocol.entity.EntityPositionData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.entity.pose.EntityPose;
@@ -12,6 +13,7 @@ import com.github.retrooper.packetevents.util.Vector3d;
 import com.github.retrooper.packetevents.util.Vector3f;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityPositionSync;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityVelocity;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerParticle;
@@ -319,6 +321,9 @@ public final class CorpseManager {
             }
 
             session.incrementTick();
+            if (session.isTeleported() && session.getTickCounter() == 1) {
+                teleportCorpseToGround(session);
+            }
             if (config.isEnableAmbientParticles()) {
                 renderAmbient(session);
             }
@@ -329,9 +334,21 @@ public final class CorpseManager {
         if (!Platform.hasPacketEvents() || session.getProfile().isPlayer()) return;
         int entityId = session.getEntityId();
         Location loc = session.getLocation();
-        Vector3d pos = new Vector3d(loc.getX(), loc.getY(), loc.getZ());
-        WrapperPlayServerEntityTeleport teleport = new WrapperPlayServerEntityTeleport(entityId, pos, loc.getYaw(), 0f, true);
-        WrapperPlayServerEntityVelocity velocity = new WrapperPlayServerEntityVelocity(entityId, new Vector3d(0, 0, 0));
+        if (loc.getWorld() == null) return;
+
+        Set<Player> targets = new HashSet<>();
+        for (UUID uid : session.getViewers()) {
+            Player p = plugin.getServer().getPlayer(uid);
+            if (p != null && p.isOnline()) targets.add(p);
+        }
+        World world = loc.getWorld();
+        double viewDistSq = config.getViewDistance() * config.getViewDistance();
+        for (Player p : world.getPlayers()) {
+            if (p.getLocation().distanceSquared(loc) <= viewDistSq) {
+                targets.add(p);
+                session.getViewers().add(p.getUniqueId());
+            }
+        }
 
         int healthIndex = 9;
         try {
@@ -348,16 +365,39 @@ public final class CorpseManager {
 
         WrapperPlayServerEntityMetadata metaPacket = new WrapperPlayServerEntityMetadata(entityId, metadata);
 
-        for (UUID uid : session.getViewers()) {
-            Player p = plugin.getServer().getPlayer(uid);
-            if (p != null && p.isOnline()) {
+        for (Player p : targets) {
+            if (p.getEntityId() != entityId) {
+                sendCorpsePositionToPlayer(p, session);
                 try {
-                    PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, teleport);
-                    PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, velocity);
                     PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, metaPacket);
                 } catch (Throwable ignored) {}
             }
         }
+    }
+
+    private void sendCorpsePositionToPlayer(Player player, CorpseSession session) {
+        if (!Platform.hasPacketEvents() || player == null || !player.isOnline()) return;
+        int entityId = session.getEntityId();
+        Location loc = session.getLocation();
+        Vector3d pos = new Vector3d(loc.getX(), loc.getY(), loc.getZ());
+        WrapperPlayServerEntityVelocity velocity = new WrapperPlayServerEntityVelocity(entityId, new Vector3d(0, 0, 0));
+
+        try {
+            if (PacketEvents.getAPI().getServerManager().getVersion().isNewerThanOrEquals(ServerVersion.V_1_21_2)) {
+                EntityPositionData posData = new EntityPositionData(pos, Vector3d.zero(), loc.getYaw(), 0f);
+                WrapperPlayServerEntityPositionSync sync = new WrapperPlayServerEntityPositionSync(entityId, posData, true);
+                PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, sync);
+            }
+        } catch (Throwable ignored) {}
+
+        try {
+            WrapperPlayServerEntityTeleport teleport = new WrapperPlayServerEntityTeleport(entityId, pos, loc.getYaw(), 0f, true);
+            PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, teleport);
+        } catch (Throwable ignored) {}
+
+        try {
+            PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, velocity);
+        } catch (Throwable ignored) {}
     }
 
     private void renderAmbient(CorpseSession session) {
@@ -466,6 +506,10 @@ public final class CorpseManager {
             PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, metaPacket);
         } catch (Throwable t) {
             plugin.getLogger().warning("Corpse state send error: " + t.getMessage());
+        }
+
+        if (session.isTeleported()) {
+            sendCorpsePositionToPlayer(player, session);
         }
     }
 
