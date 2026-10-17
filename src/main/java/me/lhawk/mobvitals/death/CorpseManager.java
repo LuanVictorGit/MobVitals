@@ -349,10 +349,10 @@ public final class CorpseManager {
         if (player.getEntityId() == entityId) return;
         if (session.getProfile().isPlayer()) return;
 
-        int healthIndex = 8;
+        int healthIndex = 9;
         try {
             if (PacketEvents.getAPI().getServerManager().getVersion().isOlderThan(ServerVersion.V_1_17)) {
-                healthIndex = 7;
+                healthIndex = 8;
             }
         } catch (Throwable ignored) {}
 

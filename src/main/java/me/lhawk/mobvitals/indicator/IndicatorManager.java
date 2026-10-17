@@ -46,7 +46,6 @@ public final class IndicatorManager {
     private final AtomicInteger indicatorIdCounter = new AtomicInteger(1_500_000_000);
     private final Map<Integer, HealthIndicator> activeIndicators = new ConcurrentHashMap<>();
     private final Map<Integer, VariationPopup> activePopups = new ConcurrentHashMap<>();
-    private final Map<Integer, Integer> entityActivePopupId = new ConcurrentHashMap<>();
     private final Map<Integer, Double> recordedHealthMap = new ConcurrentHashMap<>();
     private final Set<UUID> toggledOffPlayers = ConcurrentHashMap.newKeySet();
 
@@ -79,7 +78,6 @@ public final class IndicatorManager {
         }
         activeIndicators.clear();
         activePopups.clear();
-        entityActivePopupId.clear();
         recordedHealthMap.clear();
         toggledOffPlayers.clear();
     }
@@ -213,13 +211,6 @@ public final class IndicatorManager {
 
     public void removeEntity(int entityId) {
         recordedHealthMap.remove(entityId);
-        Integer popupId = entityActivePopupId.remove(entityId);
-        if (popupId != null) {
-            VariationPopup p = activePopups.remove(popupId);
-            if (p != null) {
-                destroyPopupForViewers(p);
-            }
-        }
         HealthIndicator indicator = activeIndicators.remove(entityId);
         if (indicator == null || !Platform.hasPacketEvents()) return;
         destroyForViewers(indicator);
@@ -265,7 +256,6 @@ public final class IndicatorManager {
         activePopups.entrySet().removeIf(entry -> {
             VariationPopup popup = entry.getValue();
             if (now >= popup.getExpireTimeMillis()) {
-                entityActivePopupId.values().remove(popup.getVirtualId());
                 destroyPopupForViewers(popup);
                 return true;
             }
@@ -282,15 +272,6 @@ public final class IndicatorManager {
 
         Location eLoc = entity.getLocation();
         if (eLoc.getWorld() == null) return;
-
-        int hostEntityId = entity.getEntityId();
-        Integer oldPopupId = entityActivePopupId.remove(hostEntityId);
-        if (oldPopupId != null) {
-            VariationPopup old = activePopups.remove(oldPopupId);
-            if (old != null) {
-                destroyPopupForViewers(old);
-            }
-        }
 
         double angle = ThreadLocalRandom.current().nextDouble(0, 2 * Math.PI);
         double dist = ThreadLocalRandom.current().nextDouble(0.25, 0.85);
@@ -318,7 +299,6 @@ public final class IndicatorManager {
             }
         }
 
-        entityActivePopupId.put(hostEntityId, popupId);
         activePopups.put(popupId, popup);
     }
 

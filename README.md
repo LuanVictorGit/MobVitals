@@ -12,12 +12,12 @@ All visual indicators and corpse persistence are rendered on the client side wit
 ---
 
 ## 2. Current Version
-**Version:** `1.0.0`
+**Version:** `1.0.1`
 
 ---
 
 ## 3. Project Status
-**Status:** `Active / Published on MineBuilders (v1.0.0)`
+**Status:** `Active / Published on MineBuilders (v1.0.1)`
 **MineBuilders Slug:** `mobvitals-health-corpses-1-16-26-3`
 **MineBuilders ID:** `cdf014fb-8da6-4fa2-8ab3-7978fe9aea61`
 
