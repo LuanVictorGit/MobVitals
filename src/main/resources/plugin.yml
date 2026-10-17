@@ -2,6 +2,7 @@ name: MobVitals
 version: '${project.version}'
 main: me.lhawk.mobvitals.MobVitalsPlugin
 api-version: '1.16'
+folia-supported: true
 author: lHawk_
 website: https://minebuilders.com.br/discord
 description: Real-time packet-based health indicators and cinematic death animations.

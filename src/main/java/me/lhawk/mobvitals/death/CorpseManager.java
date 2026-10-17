@@ -230,6 +230,7 @@ public final class CorpseManager {
             if (world == null || !world.isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) {
                 delayedDestroyIds.remove(entityId);
                 activeCorpses.remove(entityId);
+                sendDestroyToViewers(session);
                 continue;
             }
 
@@ -266,10 +267,11 @@ public final class CorpseManager {
         DeathProfile profile = session.getProfile();
         int step = session.getTickCounter();
 
-        double bodyCenterY = Math.max(0.08, Math.min(0.20, session.getEntityWidth() * 0.3));
-        double cx = loc.getX();
-        double cy = loc.getY() + bodyCenterY;
-        double cz = loc.getZ();
+        double yawRad = Math.toRadians(loc.getYaw());
+        double shift = Math.max(0.35, Math.min(0.65, session.getEntityHeight() * 0.42));
+        double cx = loc.getX() + Math.cos(yawRad) * shift;
+        double cz = loc.getZ() + Math.sin(yawRad) * shift;
+        double cy = loc.getY() + Math.max(0.12, Math.min(0.28, session.getEntityWidth() * 0.35));
 
         String[] particles = profile.getAmbientParticles();
         if (particles.length > 0) {
@@ -299,18 +301,23 @@ public final class CorpseManager {
         Location loc = session.getLocation();
         DeathProfile profile = session.getProfile();
         double radius = Math.max(0.25, Math.min(0.9, session.getEntityWidth() * 0.55));
+        double yawRad = Math.toRadians(loc.getYaw());
+        double shift = Math.max(0.35, Math.min(0.65, session.getEntityHeight() * 0.42));
+        double cx = loc.getX() + Math.cos(yawRad) * shift;
+        double cz = loc.getZ() + Math.sin(yawRad) * shift;
+        double cy = loc.getY() + Math.max(0.12, Math.min(0.28, session.getEntityWidth() * 0.35));
 
         if (config.isEnableFinalExplosion()) {
             String[] finale = profile.getFinaleParticles();
             for (String pName : finale) {
                 for (int i = 0; i < 6; i++) {
                     double theta = (i * Math.PI) / 3.0;
-                    double fx = loc.getX() + (radius * 1.4) * Math.cos(theta);
-                    double fz = loc.getZ() + (radius * 1.4) * Math.sin(theta);
-                    double fy = loc.getY() + 0.12;
+                    double fx = cx + (radius * 1.4) * Math.cos(theta);
+                    double fz = cz + (radius * 1.4) * Math.sin(theta);
+                    double fy = cy + 0.12;
                     sendParticleToViewers(session, pName, fx, fy, fz, 2, 0.05f, 0.05f, 0.05f, 0.03f);
                 }
-                sendParticleToViewers(session, pName, loc.getX(), loc.getY() + 0.25, loc.getZ(), 4, 0.1f, 0.15f, 0.1f, 0.03f);
+                sendParticleToViewers(session, pName, cx, cy + 0.15, cz, 4, 0.1f, 0.15f, 0.1f, 0.03f);
             }
         }
 
@@ -341,15 +348,17 @@ public final class CorpseManager {
         int entityId = session.getEntityId();
         if (player.getEntityId() == entityId) return;
         if (session.getProfile().isPlayer()) return;
-        int healthIndex = 9;
+
+        int healthIndex = 8;
         try {
             if (PacketEvents.getAPI().getServerManager().getVersion().isOlderThan(ServerVersion.V_1_17)) {
-                healthIndex = 8;
+                healthIndex = 7;
             }
         } catch (Throwable ignored) {}
 
-        List<EntityData<?>> metadata = new ArrayList<>(3);
+        List<EntityData<?>> metadata = new ArrayList<>(4);
         metadata.add(new EntityData<>(0, EntityDataTypes.BYTE, (byte) 0));
+        metadata.add(new EntityData<>(5, EntityDataTypes.BOOLEAN, true));
         metadata.add(new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.DYING));
         metadata.add(new EntityData<>(healthIndex, EntityDataTypes.FLOAT, 0.0f));
 
@@ -357,8 +366,8 @@ public final class CorpseManager {
         WrapperPlayServerEntityStatus statusPacket = new WrapperPlayServerEntityStatus(entityId, (byte) 3);
 
         try {
-            PacketEvents.getAPI().getPlayerManager().sendPacket(player, statusPacket);
-            PacketEvents.getAPI().getPlayerManager().sendPacket(player, metaPacket);
+            PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, metaPacket);
+            PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, statusPacket);
         } catch (Throwable t) {
             plugin.getLogger().warning("Corpse state send error: " + t.getMessage());
         }
@@ -367,11 +376,26 @@ public final class CorpseManager {
     private void sendDestroyToViewers(CorpseSession session) {
         if (!Platform.hasPacketEvents() || session.getProfile().isPlayer()) return;
         WrapperPlayServerDestroyEntities destroy = new WrapperPlayServerDestroyEntities(session.getEntityId());
+
+        Set<Player> targets = new HashSet<>();
         for (UUID uid : session.getViewers()) {
             Player p = plugin.getServer().getPlayer(uid);
-            if (p != null && p.isOnline() && p.getEntityId() != session.getEntityId()) {
+            if (p != null && p.isOnline()) targets.add(p);
+        }
+        World world = session.getLocation().getWorld();
+        if (world != null) {
+            double viewDistSq = config.getViewDistance() * config.getViewDistance();
+            for (Player p : world.getPlayers()) {
+                if (p.getLocation().distanceSquared(session.getLocation()) <= viewDistSq) {
+                    targets.add(p);
+                }
+            }
+        }
+
+        for (Player p : targets) {
+            if (p.getEntityId() != session.getEntityId()) {
                 try {
-                    PacketEvents.getAPI().getPlayerManager().sendPacket(p, destroy);
+                    PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, destroy);
                 } catch (Throwable ignored) {}
             }
         }

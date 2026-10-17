@@ -46,6 +46,7 @@ public final class IndicatorManager {
     private final AtomicInteger indicatorIdCounter = new AtomicInteger(1_500_000_000);
     private final Map<Integer, HealthIndicator> activeIndicators = new ConcurrentHashMap<>();
     private final Map<Integer, VariationPopup> activePopups = new ConcurrentHashMap<>();
+    private final Map<Integer, Integer> entityActivePopupId = new ConcurrentHashMap<>();
     private final Map<Integer, Double> recordedHealthMap = new ConcurrentHashMap<>();
     private final Set<UUID> toggledOffPlayers = ConcurrentHashMap.newKeySet();
 
@@ -78,6 +79,7 @@ public final class IndicatorManager {
         }
         activeIndicators.clear();
         activePopups.clear();
+        entityActivePopupId.clear();
         recordedHealthMap.clear();
         toggledOffPlayers.clear();
     }
@@ -206,18 +208,18 @@ public final class IndicatorManager {
     public void handleEntityDeath(LivingEntity entity) {
         if (entity == null) return;
         int entityId = entity.getEntityId();
-        Double previousHealthObj = recordedHealthMap.remove(entityId);
-        double fatalDiff = previousHealthObj != null ? previousHealthObj : getMaxHealth(entity);
-        if (fatalDiff >= config.getPopupThreshold() && config.isPopupsEnabled() && config.isIndicatorsEnabled() && isEligibleType(entity)) {
-            if (!activePopups.containsKey(entityId)) {
-                spawnVariationPopup(entity, fatalDiff, true);
-            }
-        }
         removeEntity(entityId);
     }
 
     public void removeEntity(int entityId) {
         recordedHealthMap.remove(entityId);
+        Integer popupId = entityActivePopupId.remove(entityId);
+        if (popupId != null) {
+            VariationPopup p = activePopups.remove(popupId);
+            if (p != null) {
+                destroyPopupForViewers(p);
+            }
+        }
         HealthIndicator indicator = activeIndicators.remove(entityId);
         if (indicator == null || !Platform.hasPacketEvents()) return;
         destroyForViewers(indicator);
@@ -263,12 +265,13 @@ public final class IndicatorManager {
         activePopups.entrySet().removeIf(entry -> {
             VariationPopup popup = entry.getValue();
             if (now >= popup.getExpireTimeMillis()) {
+                entityActivePopupId.values().remove(popup.getVirtualId());
                 destroyPopupForViewers(popup);
                 return true;
             }
 
             Location pLoc = popup.getLocation();
-            pLoc.add(0.0, 0.035, 0.0);
+            pLoc.add(0.0, 0.038, 0.0);
             teleportPopupForViewers(popup, pLoc);
             return false;
         });
@@ -280,11 +283,22 @@ public final class IndicatorManager {
         Location eLoc = entity.getLocation();
         if (eLoc.getWorld() == null) return;
 
-        double jitterX = (ThreadLocalRandom.current().nextDouble() - 0.5) * 0.7;
-        double jitterZ = (ThreadLocalRandom.current().nextDouble() - 0.5) * 0.7;
-        double spawnY = eLoc.getY() + Math.max(0.35, entity.getHeight() * 0.65) + (ThreadLocalRandom.current().nextDouble() * 0.25);
+        int hostEntityId = entity.getEntityId();
+        Integer oldPopupId = entityActivePopupId.remove(hostEntityId);
+        if (oldPopupId != null) {
+            VariationPopup old = activePopups.remove(oldPopupId);
+            if (old != null) {
+                destroyPopupForViewers(old);
+            }
+        }
 
-        Location popupLoc = new Location(eLoc.getWorld(), eLoc.getX() + jitterX, spawnY, eLoc.getZ() + jitterZ);
+        double angle = ThreadLocalRandom.current().nextDouble(0, 2 * Math.PI);
+        double dist = ThreadLocalRandom.current().nextDouble(0.25, 0.85);
+        double offsetX = Math.cos(angle) * dist;
+        double offsetZ = Math.sin(angle) * dist;
+        double spawnY = eLoc.getY() + Math.max(0.55, entity.getHeight() * 0.70) + ThreadLocalRandom.current().nextDouble(-0.1, 0.35);
+
+        Location popupLoc = new Location(eLoc.getWorld(), eLoc.getX() + offsetX, spawnY, eLoc.getZ() + offsetZ);
         String valStr = (amount == (long) amount) ? String.valueOf((long) amount) : String.format(Locale.ROOT, "%.1f", amount);
         String template = isDamage ? config.getDamageFormat() : config.getHealFormat();
         String formatted = template.replace("<value>", valStr);
@@ -304,6 +318,7 @@ public final class IndicatorManager {
             }
         }
 
+        entityActivePopupId.put(hostEntityId, popupId);
         activePopups.put(popupId, popup);
     }
 
@@ -336,7 +351,7 @@ public final class IndicatorManager {
         Component comp = formatIndicator(entity, health, maxHealth);
         int virtualId = indicator.getVirtualIndicatorId();
 
-        double yOffset = entity.getHeight() + config.getHeightOffset() - 1.25;
+        double yOffset = entity.getHeight() + config.getHeightOffset();
         Vector3d pos = new Vector3d(loc.getX(), loc.getY() + yOffset, loc.getZ());
 
         WrapperPlayServerSpawnEntity spawn = new WrapperPlayServerSpawnEntity(
@@ -359,7 +374,7 @@ public final class IndicatorManager {
 
         int virtualId = popup.getVirtualId();
         Location loc = popup.getLocation();
-        Vector3d pos = new Vector3d(loc.getX(), loc.getY() - 1.25, loc.getZ());
+        Vector3d pos = new Vector3d(loc.getX(), loc.getY(), loc.getZ());
 
         WrapperPlayServerSpawnEntity spawn = new WrapperPlayServerSpawnEntity(
                 virtualId,
@@ -378,7 +393,7 @@ public final class IndicatorManager {
 
     private void teleportIndicatorForViewers(HealthIndicator indicator, LivingEntity entity, Location loc) {
         if (!Platform.hasPacketEvents()) return;
-        double yOffset = entity.getHeight() + config.getHeightOffset() - 1.25;
+        double yOffset = entity.getHeight() + config.getHeightOffset();
         Vector3d pos = new Vector3d(loc.getX(), loc.getY() + yOffset, loc.getZ());
         WrapperPlayServerEntityTeleport tp = new WrapperPlayServerEntityTeleport(
                 indicator.getVirtualIndicatorId(),
@@ -396,7 +411,7 @@ public final class IndicatorManager {
 
     private void teleportPopupForViewers(VariationPopup popup, Location loc) {
         if (!Platform.hasPacketEvents()) return;
-        Vector3d pos = new Vector3d(loc.getX(), loc.getY() - 1.25, loc.getZ());
+        Vector3d pos = new Vector3d(loc.getX(), loc.getY(), loc.getZ());
         WrapperPlayServerEntityTeleport tp = new WrapperPlayServerEntityTeleport(
                 popup.getVirtualId(),
                 pos,
@@ -554,6 +569,7 @@ public final class IndicatorManager {
                 .replace("<name>", name)
                 .replace("<bar>", bar.toString())
                 .replace("<color>", color)
+                .replace("</color>", "<reset>")
                 .replace("<current>", currentStr)
                 .replace("<max>", maxStr)
                 .replace("<percent>", percentStr);

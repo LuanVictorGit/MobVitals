@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090d16"/>
+      <stop offset="50%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#6366f1" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#ec4899" stop-opacity="0.5"/>
+    </linearGradient>
+    <linearGradient id="heartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff4b72"/>
+      <stop offset="50%" stop-color="#e11d48"/>
+      <stop offset="100%" stop-color="#9f1239"/>
+    </linearGradient>
+    <linearGradient id="pulseGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="35%" stop-color="#10b981"/>
+      <stop offset="70%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#f43f5e"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="heartGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#e11d48" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect x="24" y="24" width="464" height="464" rx="100" fill="url(#bgGrad)"/>
+  <rect x="24" y="24" width="464" height="464" rx="100" fill="none" stroke="url(#borderGrad)" stroke-width="4"/>
+
+  <!-- Subtle Overhead Healthbar Segment Capsule Motif -->
+  <g transform="translate(136, 92)" filter="url(#glow)">
+    <rect x="0" y="0" width="36" height="14" rx="5" fill="#22c55e"/>
+    <rect x="46" y="0" width="36" height="14" rx="5" fill="#22c55e"/>
+    <rect x="92" y="0" width="36" height="14" rx="5" fill="#eab308"/>
+    <rect x="138" y="0" width="36" height="14" rx="5" fill="#f97316"/>
+    <rect x="184" y="0" width="36" height="14" rx="5" fill="#ef4444"/>
+    <rect x="230" y="0" width="36" height="14" rx="5" fill="#334155"/>
+  </g>
+
+  <!-- Central Heart Silhouette with 3D Depth & Shadow -->
+  <g filter="url(#heartGlow)">
+    <path d="M 256 420 C 230 395 100 290 100 195 C 100 135 145 95 205 95 C 232 95 248 108 256 122 C 264 108 280 95 307 95 C 367 95 412 135 412 195 C 412 290 282 395 256 420 Z"
+          fill="url(#heartGrad)"/>
+  </g>
+
+  <!-- Inner Heart Highlight -->
+  <path d="M 125 190 C 125 150 155 120 195 120 C 205 120 215 124 225 132 C 170 145 138 185 125 190 Z"
+        fill="#ffffff" opacity="0.35"/>
+
+  <!-- Dynamic ECG / Vital Signs Pulse Line Across Heart -->
+  <g filter="url(#glow)">
+    <path d="M 70 260 L 160 260 L 185 220 L 215 320 L 245 160 L 275 340 L 305 230 L 325 280 L 345 260 L 442 260"
+          fill="none" stroke="url(#pulseGrad)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Ambient Soul Essence Particles (Cinematic Death Dissipation Motif) -->
+  <circle cx="160" cy="385" r="5" fill="#38bdf8" opacity="0.75" filter="url(#glow)"/>
+  <circle cx="340" cy="390" r="4.5" fill="#c084fc" opacity="0.8" filter="url(#glow)"/>
+  <circle cx="215" cy="445" r="3.5" fill="#f43f5e" opacity="0.6" filter="url(#glow)"/>
+  <circle cx="295" cy="440" r="4" fill="#38bdf8" opacity="0.7" filter="url(#glow)"/>
+  <circle cx="256" cy="465" r="5" fill="#a855f7" opacity="0.85" filter="url(#glow)"/>
+</svg>

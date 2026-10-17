@@ -44,9 +44,9 @@ indicators:
   # Number of segments in the visual health bar.
   bar-length: 10
   # Symbol used for filled health segments.
-  symbol-full: "■"
+  symbol-full: "❙"
   # Symbol used for empty health segments.
-  symbol-empty: "□"
+  symbol-empty: "❙"
   # Color tag for high health (>= 75%). Uses Adventure MiniMessage format.
   color-high: "<green>"
   # Color tag for medium health (50% - 74%).
@@ -59,11 +59,11 @@ indicators:
   color-empty: "<dark_gray>"
   # Indicator format for general mobs.
   # Placeholders: <name>, <bar>, <color>, <current>, <max>, <percent>
-  format: "<name> <bar> <color><current></color><gray>/</gray><green><max></green> <red>❤</red>"
+  format: "<white><bold><name></bold></white> <bar> <color><current><reset><dark_gray>/</dark_gray><gray><max></gray> <red>❤</red>"
   # Indicator format for players.
-  player-format: "<gold><name></gold> <bar> <color><current></color><gray>/</gray><green><max></green> <red>❤</red>"
+  player-format: "<gold><bold><name></bold></gold> <bar> <color><current><reset><dark_gray>/</dark_gray><gray><max></gray> <red>❤</red>"
   # Indicator format for boss mobs.
-  boss-format: "<dark_purple><bold><name></bold></dark_purple> <bar> <color><current></color><gray>/</gray><green><max></green> <red>❤</red> <yellow>(<percent>%)</yellow>"
+  boss-format: "<light_purple><bold><name></bold></light_purple> <bar> <color><current><reset><dark_gray>/</dark_gray><gray><max></gray> <red>❤</red> <yellow>(<percent>%)</yellow>"
   # Entity types that should NEVER display a health indicator.
   blacklist:
     - "ARMOR_STAND"
