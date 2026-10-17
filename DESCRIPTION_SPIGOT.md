@@ -19,6 +19,13 @@ Above their heads, sleek real-time health indicators and floating damage/heal po
 [*] [B]Multi-Platform & Folia Ready:[/B] Native support for Paper, Spigot, Purpur, and Folia region threading without race conditions or main-thread hitching.
 [/LIST]
 
+[B][SIZE=5]🔧 Changelog v1.0.5[/SIZE][/B]
+[LIST]
+[*] [B]Smooth Death Fall & 2-Tick Anchor (~100ms - 250ms):[/B] Permitted natural death event packets (status 3) so entities gracefully tilt and lie flat onto the ground before anchoring at 2 ticks with a 5-tick (~250ms) stability re-confirmation directly at ambient particle coordinates.
+[*] [B]Damage Tint Elimination:[/B] Cancelled damage and hurt animation packets on fallen entities so corpses retain their natural colors and textures throughout the entire duration.
+[*] [B]Instant & Reliable Hit Holograms:[/B] Synchronously dispatched floating damage popups on every hit (including fatal hits and rapid consecutive attacks), guaranteeing that damage indicators never fail to appear.
+[/LIST]
+
 [B][SIZE=5]🔧 Changelog v1.0.4[/SIZE][/B]
 [LIST]
 [*] [B]1.21.2+ & 26.2 EntityPositionSync Teleportation:[/B] Implemented modern Minecraft 1.21.2+ [FONT=Courier New]ClientboundEntityPositionSyncPacket[/FONT] position syncing. Dead corpses now accurately teleport directly onto their particle spawn point 1 tick after death, completely resolving knockback separation.

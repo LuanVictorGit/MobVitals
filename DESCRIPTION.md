@@ -22,9 +22,16 @@
   <li><strong>Multi-Platform &amp; Folia Ready:</strong> Native support for Paper, Spigot, Purpur, and Folia region threading without race conditions or main-thread hitching.</li>
 </ul>
 
+<h3>Changelog v1.0.5</h3>
+<ul>
+  <li><strong>Fluxo de Morte Suave &amp; Âncora em 2 Ticks (~100ms - 250ms):</strong> Permitido o envio do status 3 para que a entidade execute sua animação natural de tombar ao solo antes de ser ancorada aos 2 ticks com estabilização aos 5 ticks (250ms) junto às partículas ambientes.</li>
+  <li><strong>Remoção do Efeito Vermelho:</strong> O corpo tem seu dano e overlay vermelho normalizados, mantendo suas cores e texturas originais intactas até a dissipação final.</li>
+  <li><strong>Hologramas de Dano Instantâneos e Confiáveis:</strong> Disparo síncrono dos popups de dano em cada hit (inclusive golpes letais e ataques rápidos consecutivos), eliminando qualquer falha ou perda de exibição de dano.</li>
+</ul>
+
 <h3>Changelog v1.0.4</h3>
 <ul>
-  <li><strong>Teleporte de Posição 1.21.2+ / 26.2 (EntityPositionSync):</strong> Implementada a sincronização de posição através do pacote moderno <code>ClientboundEntityPositionSyncPacket</code> após exatamente 1 tick da morte. Isso corrige em definitivo o teleporte do corpo para o local de nascimento das partículas no Minecraft 1.21.2+, eliminando o desvio causado por knockback anterior.</li>
+  <li><strong>Teleporte de Posição 1.21.2+ / 26.2 (EntityPositionSync):</strong> Implementada a sincronização de posição através do pacote moderno <code>ClientboundEntityPositionSyncPacket</code> para compatibilidade de teleporte.</li>
 </ul>
 
 <h3>Changelog v1.0.3</h3>

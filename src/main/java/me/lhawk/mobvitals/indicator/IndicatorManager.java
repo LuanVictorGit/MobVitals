@@ -127,27 +127,26 @@ public final class IndicatorManager {
     }
 
     public void onDamage(LivingEntity entity, double finalDamage) {
-        if (!config.isIndicatorsEnabled() || entity == null || !isEligibleType(entity)) return;
+        if ((!config.isIndicatorsEnabled() && !config.isPopupsEnabled()) || entity == null || !isEligibleType(entity)) return;
 
         int entityId = entity.getEntityId();
         double currentHealth = Math.max(0.0, entity.getHealth());
-        double damageAmount = Math.max(0.0, Math.min(currentHealth, finalDamage));
-        double healthAfter = Math.max(0.0, currentHealth - damageAmount);
+        double healthAfter = Math.max(0.0, currentHealth - finalDamage);
         double maxHealth = getMaxHealth(entity);
 
         recordedHealthMap.put(entityId, healthAfter);
 
-        if (damageAmount >= config.getPopupThreshold() && config.isPopupsEnabled()) {
-            spawnVariationPopup(entity, damageAmount, true);
+        if (finalDamage >= config.getPopupThreshold() && config.isPopupsEnabled()) {
+            spawnVariationPopup(entity, finalDamage, true);
         }
 
-        if (healthAfter > 0.0) {
+        if (healthAfter > 0.0 && config.isIndicatorsEnabled()) {
             showOrUpdateIndicator(entity, healthAfter, maxHealth);
         }
     }
 
     public void onHeal(LivingEntity entity, double amount) {
-        if (!config.isIndicatorsEnabled() || entity == null || !isEligibleType(entity)) return;
+        if ((!config.isIndicatorsEnabled() && !config.isPopupsEnabled()) || entity == null || !isEligibleType(entity)) return;
 
         int entityId = entity.getEntityId();
         double currentHealth = Math.max(0.0, entity.getHealth());
@@ -161,7 +160,9 @@ public final class IndicatorManager {
             spawnVariationPopup(entity, actualHeal, false);
         }
 
-        showOrUpdateIndicator(entity, healthAfter, maxHealth);
+        if (config.isIndicatorsEnabled()) {
+            showOrUpdateIndicator(entity, healthAfter, maxHealth);
+        }
     }
 
     public void handleHealthChange(LivingEntity entity) {
@@ -183,6 +184,14 @@ public final class IndicatorManager {
             }
         }
 
+        showOrUpdateIndicator(entity, currentHealth, maxHealth);
+    }
+
+    public void updateIndicatorHealth(LivingEntity entity) {
+        if (!config.isIndicatorsEnabled() || entity == null || !isEligible(entity)) return;
+        double currentHealth = getEffectiveHealth(entity);
+        double maxHealth = getMaxHealth(entity);
+        recordedHealthMap.put(entity.getEntityId(), currentHealth);
         showOrUpdateIndicator(entity, currentHealth, maxHealth);
     }
 

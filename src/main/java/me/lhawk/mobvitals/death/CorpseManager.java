@@ -265,10 +265,14 @@ public final class CorpseManager {
         activeCorpses.put(entityId, session);
 
         if (config.isEnableCorpseBody() && !isPlayer) {
-            sendCorpseStateToViewers(session);
-            Schedulers.later(plugin, 1L, () -> {
+            Schedulers.later(plugin, 2L, () -> {
                 if (activeCorpses.containsKey(entityId)) {
                     session.setTeleported(true);
+                    teleportCorpseToGround(session);
+                }
+            });
+            Schedulers.later(plugin, 5L, () -> {
+                if (activeCorpses.containsKey(entityId)) {
                     teleportCorpseToGround(session);
                 }
             });
@@ -321,9 +325,6 @@ public final class CorpseManager {
             }
 
             session.incrementTick();
-            if (session.isTeleported() && session.getTickCounter() == 1) {
-                teleportCorpseToGround(session);
-            }
             if (config.isEnableAmbientParticles()) {
                 renderAmbient(session);
             }
@@ -360,8 +361,8 @@ public final class CorpseManager {
         List<EntityData<?>> metadata = new ArrayList<>(4);
         metadata.add(new EntityData<>(0, EntityDataTypes.BYTE, (byte) 0));
         metadata.add(new EntityData<>(5, EntityDataTypes.BOOLEAN, true));
-        metadata.add(new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.SLEEPING));
-        metadata.add(new EntityData<>(healthIndex, EntityDataTypes.FLOAT, 1.0f));
+        metadata.add(new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.DYING));
+        metadata.add(new EntityData<>(healthIndex, EntityDataTypes.FLOAT, 0.0f));
 
         WrapperPlayServerEntityMetadata metaPacket = new WrapperPlayServerEntityMetadata(entityId, metadata);
 
@@ -486,6 +487,7 @@ public final class CorpseManager {
         int entityId = session.getEntityId();
         if (player.getEntityId() == entityId) return;
         if (session.getProfile().isPlayer()) return;
+        if (!session.isTeleported()) return;
 
         int healthIndex = 9;
         try {
@@ -497,8 +499,8 @@ public final class CorpseManager {
         List<EntityData<?>> metadata = new ArrayList<>(4);
         metadata.add(new EntityData<>(0, EntityDataTypes.BYTE, (byte) 0));
         metadata.add(new EntityData<>(5, EntityDataTypes.BOOLEAN, true));
-        metadata.add(new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.SLEEPING));
-        metadata.add(new EntityData<>(healthIndex, EntityDataTypes.FLOAT, 1.0f));
+        metadata.add(new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.DYING));
+        metadata.add(new EntityData<>(healthIndex, EntityDataTypes.FLOAT, 0.0f));
 
         WrapperPlayServerEntityMetadata metaPacket = new WrapperPlayServerEntityMetadata(entityId, metadata);
 

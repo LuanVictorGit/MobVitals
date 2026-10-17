@@ -4,8 +4,10 @@ import com.github.retrooper.packetevents.event.PacketListenerAbstract;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.event.PacketSendEvent;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDamageEvent;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityStatus;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerHurtAnimation;
 import me.lhawk.mobvitals.death.CorpseManager;
 
 import java.util.ArrayList;
@@ -25,6 +27,10 @@ public final class VitalPacketListener extends PacketListenerAbstract {
             handleDestroyEntities(event);
         } else if (event.getPacketType() == PacketType.Play.Server.ENTITY_STATUS) {
             handleEntityStatus(event);
+        } else if (event.getPacketType() == PacketType.Play.Server.HURT_ANIMATION) {
+            handleHurtAnimation(event);
+        } else if (event.getPacketType() == PacketType.Play.Server.DAMAGE_EVENT) {
+            handleDamageEvent(event);
         }
     }
 
@@ -72,11 +78,27 @@ public final class VitalPacketListener extends PacketListenerAbstract {
     private void handleEntityStatus(PacketSendEvent event) {
         WrapperPlayServerEntityStatus status = new WrapperPlayServerEntityStatus(event);
         int st = status.getStatus();
-        if (st == 60 || st == 3) {
+        if (st == 60 || st == 2) {
             int entityId = status.getEntityId();
             if (corpseManager.isDelayedDestroy(entityId)) {
                 event.setCancelled(true);
             }
+        }
+    }
+
+    private void handleHurtAnimation(PacketSendEvent event) {
+        WrapperPlayServerHurtAnimation hurt = new WrapperPlayServerHurtAnimation(event);
+        int entityId = hurt.getEntityId();
+        if (corpseManager.isDelayedDestroy(entityId)) {
+            event.setCancelled(true);
+        }
+    }
+
+    private void handleDamageEvent(PacketSendEvent event) {
+        WrapperPlayServerDamageEvent dmg = new WrapperPlayServerDamageEvent(event);
+        int entityId = dmg.getEntityId();
+        if (corpseManager.isDelayedDestroy(entityId)) {
+            event.setCancelled(true);
         }
     }
 }
