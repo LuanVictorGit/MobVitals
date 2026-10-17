@@ -12,11 +12,15 @@ import com.github.retrooper.packetevents.util.Vector3d;
 import com.github.retrooper.packetevents.util.Vector3f;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityStatus;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityVelocity;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerParticle;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
 import me.lhawk.mobvitals.config.PluginConfig;
 import me.lhawk.mobvitals.util.Platform;
 import me.lhawk.mobvitals.util.Schedulers;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Entity;
@@ -36,6 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class CorpseManager {
     public static final class CorpseSession {
         private final int entityId;
+        private final UUID entityUuid;
         private final Location location;
         private final DeathProfile profile;
         private final double entityWidth;
@@ -43,9 +48,11 @@ public final class CorpseManager {
         private volatile long expireTimeMillis;
         private final Set<UUID> viewers;
         private int tickCounter;
+        private boolean teleportedAt10Ticks;
 
-        public CorpseSession(int entityId, Location location, DeathProfile profile, double entityWidth, double entityHeight, long expireTimeMillis, Set<UUID> viewers) {
+        public CorpseSession(int entityId, UUID entityUuid, Location location, DeathProfile profile, double entityWidth, double entityHeight, long expireTimeMillis, Set<UUID> viewers) {
             this.entityId = entityId;
+            this.entityUuid = entityUuid;
             this.location = location;
             this.profile = profile;
             this.entityWidth = entityWidth;
@@ -53,10 +60,15 @@ public final class CorpseManager {
             this.expireTimeMillis = expireTimeMillis;
             this.viewers = viewers;
             this.tickCounter = 0;
+            this.teleportedAt10Ticks = false;
         }
 
         public int getEntityId() {
             return entityId;
+        }
+
+        public UUID getEntityUuid() {
+            return entityUuid;
         }
 
         public Location getLocation() {
@@ -94,12 +106,21 @@ public final class CorpseManager {
         public void incrementTick() {
             this.tickCounter++;
         }
+
+        public boolean isTeleportedAt10Ticks() {
+            return teleportedAt10Ticks;
+        }
+
+        public void setTeleportedAt10Ticks(boolean teleportedAt10Ticks) {
+            this.teleportedAt10Ticks = teleportedAt10Ticks;
+        }
     }
 
     private final Plugin plugin;
     private final PluginConfig config;
     private final Map<Integer, CorpseSession> activeCorpses = new ConcurrentHashMap<>();
     private final Set<Integer> delayedDestroyIds = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> initializedTeamPlayers = ConcurrentHashMap.newKeySet();
     private Schedulers.TaskHandle tickTask;
 
     public CorpseManager(Plugin plugin, PluginConfig config) {
@@ -123,6 +144,7 @@ public final class CorpseManager {
             sendDestroyToViewers(session);
         }
         activeCorpses.clear();
+        initializedTeamPlayers.clear();
     }
 
     public void removeCorpse(int entityId) {
@@ -142,6 +164,7 @@ public final class CorpseManager {
         if (entity instanceof Player && !config.isEnableForPlayers()) return;
 
         int entityId = entity.getEntityId();
+        UUID entityUuid = entity.getUniqueId();
         Location loc = entity.getLocation();
         if (loc.getWorld() == null) return;
 
@@ -200,7 +223,7 @@ public final class CorpseManager {
 
         double width = Math.max(0.3, entity.getWidth());
         double height = Math.max(0.3, entity.getHeight());
-        CorpseSession session = new CorpseSession(entityId, loc.clone(), profile, width, height, expireTime, viewers);
+        CorpseSession session = new CorpseSession(entityId, entityUuid, loc.clone(), profile, width, height, expireTime, viewers);
         activeCorpses.put(entityId, session);
 
         if (config.isEnableCorpseBody() && !isPlayer) {
@@ -253,8 +276,48 @@ public final class CorpseManager {
             }
 
             session.incrementTick();
+            if (session.getTickCounter() >= 10 && !session.isTeleportedAt10Ticks()) {
+                session.setTeleportedAt10Ticks(true);
+                teleportCorpseToGround(session);
+            }
+
             if (config.isEnableAmbientParticles()) {
                 renderAmbient(session);
+            }
+        }
+    }
+
+    private void teleportCorpseToGround(CorpseSession session) {
+        if (!Platform.hasPacketEvents() || session.getProfile().isPlayer()) return;
+        int entityId = session.getEntityId();
+        Location loc = session.getLocation();
+        Vector3d pos = new Vector3d(loc.getX(), loc.getY(), loc.getZ());
+        WrapperPlayServerEntityTeleport teleport = new WrapperPlayServerEntityTeleport(entityId, pos, loc.getYaw(), 0f, true);
+        WrapperPlayServerEntityVelocity velocity = new WrapperPlayServerEntityVelocity(entityId, new Vector3d(0, 0, 0));
+
+        int healthIndex = 9;
+        try {
+            if (PacketEvents.getAPI().getServerManager().getVersion().isOlderThan(ServerVersion.V_1_17)) {
+                healthIndex = 8;
+            }
+        } catch (Throwable ignored) {}
+
+        List<EntityData<?>> metadata = new ArrayList<>(4);
+        metadata.add(new EntityData<>(0, EntityDataTypes.BYTE, (byte) 0));
+        metadata.add(new EntityData<>(5, EntityDataTypes.BOOLEAN, true));
+        metadata.add(new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.SLEEPING));
+        metadata.add(new EntityData<>(healthIndex, EntityDataTypes.FLOAT, 1.0f));
+
+        WrapperPlayServerEntityMetadata metaPacket = new WrapperPlayServerEntityMetadata(entityId, metadata);
+
+        for (UUID uid : session.getViewers()) {
+            Player p = plugin.getServer().getPlayer(uid);
+            if (p != null && p.isOnline()) {
+                try {
+                    PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, teleport);
+                    PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, velocity);
+                    PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, metaPacket);
+                } catch (Throwable ignored) {}
             }
         }
     }
@@ -267,21 +330,19 @@ public final class CorpseManager {
         DeathProfile profile = session.getProfile();
         int step = session.getTickCounter();
 
-        double yawRad = Math.toRadians(loc.getYaw());
-        double shift = Math.max(0.35, Math.min(0.65, session.getEntityHeight() * 0.42));
-        double cx = loc.getX() + Math.cos(yawRad) * shift;
-        double cz = loc.getZ() + Math.sin(yawRad) * shift;
-        double cy = loc.getY() + Math.max(0.12, Math.min(0.28, session.getEntityWidth() * 0.35));
+        double cx = loc.getX();
+        double cz = loc.getZ();
+        double cy = loc.getY() + 0.15;
 
         String[] particles = profile.getAmbientParticles();
         if (particles.length > 0) {
             String pName = particles[step % particles.length];
-            sendParticleToViewers(session, pName, cx, cy, cz, 1, 0.05f, 0.04f, 0.05f, 0.01f);
+            sendParticleToViewers(session, pName, cx, cy, cz, 1, 0.15f, 0.05f, 0.15f, 0.01f);
         }
 
         if (particles.length > 1) {
             String second = particles[(step + 1) % particles.length];
-            sendParticleToViewers(session, second, cx, cy, cz, 1, 0.04f, 0.03f, 0.04f, 0.01f);
+            sendParticleToViewers(session, second, cx, cy, cz, 1, 0.12f, 0.04f, 0.12f, 0.01f);
         }
 
         if (step % 30 == 0 && config.isEnableSoundEffects()) {
@@ -301,11 +362,9 @@ public final class CorpseManager {
         Location loc = session.getLocation();
         DeathProfile profile = session.getProfile();
         double radius = Math.max(0.25, Math.min(0.9, session.getEntityWidth() * 0.55));
-        double yawRad = Math.toRadians(loc.getYaw());
-        double shift = Math.max(0.35, Math.min(0.65, session.getEntityHeight() * 0.42));
-        double cx = loc.getX() + Math.cos(yawRad) * shift;
-        double cz = loc.getZ() + Math.sin(yawRad) * shift;
-        double cy = loc.getY() + Math.max(0.12, Math.min(0.28, session.getEntityWidth() * 0.35));
+        double cx = loc.getX();
+        double cz = loc.getZ();
+        double cy = loc.getY() + 0.15;
 
         if (config.isEnableFinalExplosion()) {
             String[] finale = profile.getFinaleParticles();
@@ -333,6 +392,30 @@ public final class CorpseManager {
         sendDestroyToViewers(session);
     }
 
+    private void ensureCorpseTeam(Player player) {
+        if (!Platform.hasPacketEvents() || player == null || !player.isOnline()) return;
+        if (initializedTeamPlayers.add(player.getUniqueId())) {
+            WrapperPlayServerTeams.ScoreBoardTeamInfo info = new WrapperPlayServerTeams.ScoreBoardTeamInfo(
+                    Component.text("mv_corpse"),
+                    Component.empty(),
+                    Component.empty(),
+                    WrapperPlayServerTeams.NameTagVisibility.NEVER,
+                    WrapperPlayServerTeams.CollisionRule.NEVER,
+                    NamedTextColor.WHITE,
+                    WrapperPlayServerTeams.OptionData.NONE
+            );
+            WrapperPlayServerTeams createTeam = new WrapperPlayServerTeams(
+                    "mv_corpse",
+                    WrapperPlayServerTeams.TeamMode.CREATE,
+                    info,
+                    Collections.emptyList()
+            );
+            try {
+                PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, createTeam);
+            } catch (Throwable ignored) {}
+        }
+    }
+
     private void sendCorpseStateToViewers(CorpseSession session) {
         if (!Platform.hasPacketEvents()) return;
         for (UUID uid : session.getViewers()) {
@@ -349,6 +432,18 @@ public final class CorpseManager {
         if (player.getEntityId() == entityId) return;
         if (session.getProfile().isPlayer()) return;
 
+        ensureCorpseTeam(player);
+        String entry = session.getEntityUuid() != null ? session.getEntityUuid().toString() : String.valueOf(entityId);
+        WrapperPlayServerTeams addEntity = new WrapperPlayServerTeams(
+                "mv_corpse",
+                WrapperPlayServerTeams.TeamMode.ADD_ENTITIES,
+                (WrapperPlayServerTeams.ScoreBoardTeamInfo) null,
+                Collections.singletonList(entry)
+        );
+        try {
+            PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, addEntity);
+        } catch (Throwable ignored) {}
+
         int healthIndex = 9;
         try {
             if (PacketEvents.getAPI().getServerManager().getVersion().isOlderThan(ServerVersion.V_1_17)) {
@@ -359,15 +454,13 @@ public final class CorpseManager {
         List<EntityData<?>> metadata = new ArrayList<>(4);
         metadata.add(new EntityData<>(0, EntityDataTypes.BYTE, (byte) 0));
         metadata.add(new EntityData<>(5, EntityDataTypes.BOOLEAN, true));
-        metadata.add(new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.DYING));
-        metadata.add(new EntityData<>(healthIndex, EntityDataTypes.FLOAT, 0.0f));
+        metadata.add(new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.SLEEPING));
+        metadata.add(new EntityData<>(healthIndex, EntityDataTypes.FLOAT, 1.0f));
 
         WrapperPlayServerEntityMetadata metaPacket = new WrapperPlayServerEntityMetadata(entityId, metadata);
-        WrapperPlayServerEntityStatus statusPacket = new WrapperPlayServerEntityStatus(entityId, (byte) 3);
 
         try {
             PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, metaPacket);
-            PacketEvents.getAPI().getPlayerManager().sendPacketSilently(player, statusPacket);
         } catch (Throwable t) {
             plugin.getLogger().warning("Corpse state send error: " + t.getMessage());
         }
@@ -376,6 +469,13 @@ public final class CorpseManager {
     private void sendDestroyToViewers(CorpseSession session) {
         if (!Platform.hasPacketEvents() || session.getProfile().isPlayer()) return;
         WrapperPlayServerDestroyEntities destroy = new WrapperPlayServerDestroyEntities(session.getEntityId());
+        String entry = session.getEntityUuid() != null ? session.getEntityUuid().toString() : String.valueOf(session.getEntityId());
+        WrapperPlayServerTeams removeEntity = new WrapperPlayServerTeams(
+                "mv_corpse",
+                WrapperPlayServerTeams.TeamMode.REMOVE_ENTITIES,
+                (WrapperPlayServerTeams.ScoreBoardTeamInfo) null,
+                Collections.singletonList(entry)
+        );
 
         Set<Player> targets = new HashSet<>();
         for (UUID uid : session.getViewers()) {
@@ -395,6 +495,7 @@ public final class CorpseManager {
         for (Player p : targets) {
             if (p.getEntityId() != session.getEntityId()) {
                 try {
+                    PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, removeEntity);
                     PacketEvents.getAPI().getPlayerManager().sendPacketSilently(p, destroy);
                 } catch (Throwable ignored) {}
             }
@@ -441,7 +542,7 @@ public final class CorpseManager {
         if (player == null || profile == null) return;
         Location loc = player.getLocation();
         Set<UUID> singleViewer = Collections.singleton(player.getUniqueId());
-        CorpseSession previewSession = new CorpseSession(1500999999, loc, profile, 0.6, 1.8, System.currentTimeMillis() + 3000L, singleViewer);
+        CorpseSession previewSession = new CorpseSession(1500999999, UUID.randomUUID(), loc, profile, 0.6, 1.8, System.currentTimeMillis() + 3000L, singleViewer);
 
         Schedulers.timer(plugin, 1L, 4L, new Runnable() {
             private int ticks = 0;

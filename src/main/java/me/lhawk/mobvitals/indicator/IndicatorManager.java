@@ -282,6 +282,7 @@ public final class IndicatorManager {
         Location popupLoc = new Location(eLoc.getWorld(), eLoc.getX() + offsetX, spawnY, eLoc.getZ() + offsetZ);
         String valStr = (amount == (long) amount) ? String.valueOf((long) amount) : String.format(Locale.ROOT, "%.1f", amount);
         String template = isDamage ? config.getDamageFormat() : config.getHealFormat();
+        template = template.replace("<emerald>", "<green>").replace("</emerald>", "</green>");
         String formatted = template.replace("<value>", valStr);
         Component component = TextUtil.parse(formatted);
 
@@ -291,6 +292,7 @@ public final class IndicatorManager {
 
         double viewDistSq = config.getViewDistance() * config.getViewDistance();
         for (Player p : eLoc.getWorld().getPlayers()) {
+            if (entity instanceof Player hostPlayer && hostPlayer.getUniqueId().equals(p.getUniqueId())) continue;
             if (toggledOffPlayers.contains(p.getUniqueId())) continue;
             if (p.getLocation().distanceSquared(eLoc) <= viewDistSq) {
                 if (popup.addViewer(p.getUniqueId())) {
@@ -310,6 +312,7 @@ public final class IndicatorManager {
 
         for (Player p : loc.getWorld().getPlayers()) {
             UUID pUid = p.getUniqueId();
+            if (host instanceof Player hostPlayer && hostPlayer.getUniqueId().equals(pUid)) continue;
             if (toggledOffPlayers.contains(pUid)) continue;
 
             boolean inRange = p.getLocation().distanceSquared(loc) <= viewDistSq;
@@ -327,6 +330,7 @@ public final class IndicatorManager {
 
     private void spawnIndicatorForPlayer(Player player, HealthIndicator indicator, LivingEntity entity, Location loc, double health, double maxHealth) {
         if (!Platform.hasPacketEvents() || player == null || !player.isOnline()) return;
+        if (entity instanceof Player hostPlayer && hostPlayer.getUniqueId().equals(player.getUniqueId())) return;
 
         Component comp = formatIndicator(entity, health, maxHealth);
         int virtualId = indicator.getVirtualIndicatorId();

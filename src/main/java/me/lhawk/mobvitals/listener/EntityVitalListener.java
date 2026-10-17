@@ -30,14 +30,24 @@ public final class EntityVitalListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEntityDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof LivingEntity living) {
-            indicatorManager.onDamage(living, event.getFinalDamage());
+            indicatorManager.recordEntityHealth(living);
+            Schedulers.later(plugin, 1L, () -> {
+                if (living.isValid() && !living.isDead()) {
+                    indicatorManager.handleHealthChange(living);
+                }
+            });
         }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEntityRegainHealth(EntityRegainHealthEvent event) {
         if (event.getEntity() instanceof LivingEntity living) {
-            indicatorManager.onHeal(living, event.getAmount());
+            indicatorManager.recordEntityHealth(living);
+            Schedulers.later(plugin, 1L, () -> {
+                if (living.isValid() && !living.isDead()) {
+                    indicatorManager.handleHealthChange(living);
+                }
+            });
         }
     }
 

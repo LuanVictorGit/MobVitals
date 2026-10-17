@@ -71,7 +71,8 @@ public final class VitalPacketListener extends PacketListenerAbstract {
 
     private void handleEntityStatus(PacketSendEvent event) {
         WrapperPlayServerEntityStatus status = new WrapperPlayServerEntityStatus(event);
-        if (status.getStatus() == 60) {
+        int st = status.getStatus();
+        if (st == 60 || st == 3) {
             int entityId = status.getEntityId();
             if (corpseManager.isDelayedDestroy(entityId)) {
                 event.setCancelled(true);

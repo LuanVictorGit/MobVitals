@@ -86,11 +86,7 @@ variation-popups:
   # Format for damage loss popups.
   # Placeholders: <value>
   damage-format: "<red>-<bold><value></bold> <dark_red>❤</dark_red>"
-  # Format for health recovery/regeneration popups.
-  # Placeholders: <value>
-  heal-format: "<green>+<bold><value></bold> <emerald>💚</emerald>"
-  # Minimum health change required to trigger a popup (prevents floating point jitter).
-  # Default: 0.1.
+  heal-format: "<green>+<bold><value></bold> <green>❤</green>"
   threshold: 0.1
 
 # Cinematic death animation and lying corpse settings (rendered 100% via PacketEvents)

@@ -19,6 +19,16 @@ Above their heads, sleek real-time health indicators and floating damage/heal po
 [*] [B]Multi-Platform & Folia Ready:[/B] Native support for Paper, Spigot, Purpur, and Folia region threading without race conditions or main-thread hitching.
 [/LIST]
 
+[B][SIZE=5]🔧 Changelog v1.0.2[/SIZE][/B]
+[LIST]
+[*] [B]1-Tick Damage Synchronization:[/B] Delayed healthbar recalculation by 1 tick on damage/heal events to reflect Bukkit's exact post-damage health calculation.
+[*] [B]Corpse Skin Normalization:[/B] Eliminated permanent red hurt overlay on dead mob bodies by cancelling status 3 packets and adopting packet-based sleep poses.
+[*] [B]Corpse Collision Elimination:[/B] Added scoreboard team collision rules ([FONT=Courier New]CollisionRule.NEVER[/FONT]) to completely stop corpses from pushing players.
+[*] [B]10-Tick Teleport Anchor:[/B] Anchors the corpse body at 10 ticks with zero delta movement, locking corpse coordinates and ambient particle wisps into vertical alignment.
+[*] [B]Self-Indicator Suppression:[/B] Players can no longer view their own healthbars or popups directly on themselves.
+[*] [B]Heal Tag Fix:[/B] Sanitized invalid [FONT=Courier New]<emerald>[/FONT] color tag in heal format.
+[/LIST]
+
 [B][SIZE=5]💻 Supported Platforms & Versions[/SIZE][/B]
 [LIST]
 [*] [B]Minecraft Versions:[/B] 1.16.5, 1.17.x, 1.18.x, 1.19.x, 1.20.x, 1.21.x, 26.2+
