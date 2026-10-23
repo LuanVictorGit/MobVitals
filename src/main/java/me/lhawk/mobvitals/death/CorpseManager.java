@@ -192,8 +192,14 @@ public final class CorpseManager {
         }
     }
 
-    public boolean isDelayedDestroy(int entityId) {
-        return delayedDestroyIds.contains(entityId);
+    /**
+     * Whether this player's copy of the dead entity is kept as a corpse. Only corpse viewers get the final
+     * destroy later, so every other player (tracking the mob from beyond view-distance) must get the real one now.
+     */
+    public boolean isDelayedDestroyFor(int entityId, UUID viewer) {
+        if (viewer == null || !delayedDestroyIds.contains(entityId)) return false;
+        CorpseSession session = activeCorpses.get(entityId);
+        return session != null && session.getViewers().contains(viewer);
     }
 
     public void onEntityDeath(Entity entity) {
@@ -243,7 +249,7 @@ public final class CorpseManager {
         long expireTime = now + durationMs;
 
         double viewDistSq = config.getViewDistance() * config.getViewDistance();
-        Set<UUID> viewers = new HashSet<>();
+        Set<UUID> viewers = ConcurrentHashMap.newKeySet();
         for (Player p : loc.getWorld().getPlayers()) {
             if (entity instanceof Player && p.getUniqueId().equals(entity.getUniqueId())) continue;
             if (p.getLocation().distanceSquared(loc) <= viewDistSq) {
@@ -585,7 +591,8 @@ public final class CorpseManager {
         Set<UUID> singleViewer = Collections.singleton(player.getUniqueId());
         CorpseSession previewSession = new CorpseSession(1500999999, UUID.randomUUID(), loc, profile, 0.6, 1.8, System.currentTimeMillis() + 3000L, singleViewer);
 
-        Schedulers.timer(plugin, 1L, 4L, new Runnable() {
+        Schedulers.TaskHandle[] task = new Schedulers.TaskHandle[1];
+        task[0] = Schedulers.timer(plugin, 1L, 4L, new Runnable() {
             private int ticks = 0;
             @Override
             public void run() {
@@ -593,8 +600,9 @@ public final class CorpseManager {
                 if (ticks < 15) {
                     previewSession.incrementTick();
                     renderAmbient(previewSession);
-                } else if (ticks == 15) {
+                } else {
                     finishCorpse(previewSession);
+                    if (task[0] != null) task[0].cancel();
                 }
             }
         });

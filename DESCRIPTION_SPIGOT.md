@@ -19,6 +19,17 @@ Above their heads, sleek real-time health indicators and floating damage/heal po
 [*] [B]Multi-Platform & Folia Ready:[/B] Native support for Paper, Spigot, Purpur, and Folia region threading without race conditions or main-thread hitching.
 [/LIST]
 
+[B][SIZE=5]🔧 Changelog v1.0.7[/SIZE][/B]
+[LIST]
+[*] [B]One Popup per Hit and Heal, No Clutter:[/B] Each entity shows at most one damage and one heal popup at a time; a new hit or heal replaces the older one ([FONT=Courier New]variation-popups.max-per-entity[/FONT], default 1, 0 = no limit).
+[*] [B]ZombieGladiators Integration:[/B] With both plugins installed every gladiator bar and popup is drawn by one plugin only, ending duplicated bars and popups (needs ZombieGladiators 1.4.1). Other plugins and admins can hide MobVitals on an entity with the metadata or scoreboard tag [FONT=Courier New]mobvitals-hide-indicator[/FONT] / [FONT=Courier New]mobvitals-hide-popups[/FONT] and rename its bar with the [FONT=Courier New]mobvitals-name[/FONT] metadata.
+[*] [B]Colored Mob Names:[/B] On Paper 1.21+/26.x the bar failed with "Legacy formatting codes have been detected" for mobs with colored names (MythicMobs, NPCs, name tags). The name now shows with its colors.
+[*] [B]Invisible, Vanished and Spectator Players:[/B] No longer get a bar or popups that gave away their position.
+[*] [B]Returning From Another World:[/B] Players coming back from another world see existing health bars again.
+[*] [B]Frozen Dead Mobs:[/B] Players watching a mob from beyond the corpse view distance kept the dead mob frozen on screen; they now get the normal removal.
+[*] [B]Other Fixes:[/B] [FONT=Courier New]/mv reload[/FONT] keeps [FONT=Courier New]/mv toggle[/FONT] choices, a memory leak that stored the health of every spawned mob is gone, [FONT=Courier New]/mv test[/FONT] no longer leaves a task running and the help header shows the real version.
+[/LIST]
+
 [B][SIZE=5]🔧 Changelog v1.0.6[/SIZE][/B]
 [LIST]
 [*] [B]Popups Always Disappear:[/B] Fixed damage/heal popups staying frozen in the air forever when [FONT=Courier New]indicators.enabled[/FONT] (or the [FONT=Courier New]general.enabled[/FONT] master switch) was off. Popup drift and removal now run independently of health bars.

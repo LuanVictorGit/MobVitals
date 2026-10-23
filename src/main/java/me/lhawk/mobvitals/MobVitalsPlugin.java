@@ -47,7 +47,7 @@ public final class MobVitalsPlugin extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new EntityVitalListener(this, indicatorManager, corpseManager), this);
 
-        MobVitalsCommand cmdExecutor = new MobVitalsCommand(config, indicatorManager, corpseManager);
+        MobVitalsCommand cmdExecutor = new MobVitalsCommand(config, indicatorManager, corpseManager, getDescription().getVersion());
         PluginCommand cmd = getCommand("mobvitals");
         if (cmd != null) {
             cmd.setExecutor(cmdExecutor);

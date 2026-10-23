@@ -65,6 +65,9 @@ indicators:
   # Indicator format for boss mobs.
   boss-format: "<light_purple><bold><name></bold></light_purple> <bar> <color><current><reset><dark_gray>/</dark_gray><gray><max></gray> <red>❤</red> <yellow>(<percent>%)</yellow>"
   # Entity types that should NEVER display a health indicator.
+  # Single entities can be excluded too: the scoreboard tag (or plugin metadata) "mobvitals-hide-indicator"
+  # removes the bar and "mobvitals-hide-popups" the popups. ZombieGladiators sets them on the gladiators it
+  # already draws itself, so each one keeps a single bar and one popup per hit.
   blacklist:
     - "ARMOR_STAND"
     - "ITEM_FRAME"
@@ -88,6 +91,9 @@ variation-popups:
   damage-format: "<red>-<bold><value></bold> <dark_red>❤</dark_red>"
   heal-format: "<green>+<bold><value></bold> <green>❤</green>"
   threshold: 0.1
+  # Popups of each kind (damage / heal) shown at once above one entity. A new hit or heal replaces the oldest,
+  # so 1 keeps a single damage and a single heal number in the air. 0 = no limit.
+  max-per-entity: 1
 
 # Cinematic death animation and lying corpse settings (rendered 100% via PacketEvents)
 death-animation:

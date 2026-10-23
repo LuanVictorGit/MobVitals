@@ -21,11 +21,13 @@ public final class MobVitalsCommand implements CommandExecutor, TabCompleter {
     private final PluginConfig config;
     private final IndicatorManager indicatorManager;
     private final CorpseManager corpseManager;
+    private final String version;
 
-    public MobVitalsCommand(PluginConfig config, IndicatorManager indicatorManager, CorpseManager corpseManager) {
+    public MobVitalsCommand(PluginConfig config, IndicatorManager indicatorManager, CorpseManager corpseManager, String version) {
         this.config = config;
         this.indicatorManager = indicatorManager;
         this.corpseManager = corpseManager;
+        this.version = version;
     }
 
     @Override
@@ -118,7 +120,7 @@ public final class MobVitalsCommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendHelp(CommandSender sender, String label) {
-        TextUtil.sendMessage(sender, "<gradient:#FF5555:#FFAA00><bold>MobVitals Commands</bold></gradient> <gray>(v1.0.0)</gray>");
+        TextUtil.sendMessage(sender, "<gradient:#FF5555:#FFAA00><bold>MobVitals Commands</bold></gradient> <gray>(v" + version + ")</gray>");
         TextUtil.sendMessage(sender, "<yellow>/" + label + " toggle</yellow> <gray>- Toggle health indicators for yourself</gray>");
         TextUtil.sendMessage(sender, "<yellow>/" + label + " info</yellow> <gray>- Show plugin stats and active visual counts</gray>");
         if (sender.hasPermission("mobvitals.admin")) {

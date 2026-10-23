@@ -43,6 +43,7 @@ public final class PluginConfig {
     private String damageFormat;
     private String healFormat;
     private double popupThreshold;
+    private int popupMaxPerEntity;
 
     private boolean deathAnimationEnabled;
     private double corpseDurationSeconds;
@@ -112,6 +113,7 @@ public final class PluginConfig {
         damageFormat = config.getString("variation-popups.damage-format", "<red>-<bold><value></bold> <dark_red>❤</dark_red>");
         healFormat = config.getString("variation-popups.heal-format", "<green>+<bold><value></bold> <emerald>💚</emerald>");
         popupThreshold = Math.max(0.01, config.getDouble("variation-popups.threshold", 0.1));
+        popupMaxPerEntity = Math.max(0, config.getInt("variation-popups.max-per-entity", 1));
 
         deathAnimationEnabled = config.getBoolean("death-animation.enabled", true);
         corpseDurationSeconds = Math.max(1.0, Math.min(30.0, config.getDouble("death-animation.corpse-duration-seconds", 4.0)));
@@ -281,6 +283,10 @@ public final class PluginConfig {
 
     public double getPopupThreshold() {
         return popupThreshold;
+    }
+
+    public int getPopupMaxPerEntity() {
+        return popupMaxPerEntity;
     }
 
     public boolean isDenseCorpseReduction() {

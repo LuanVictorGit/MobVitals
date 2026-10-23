@@ -12,6 +12,7 @@ import me.lhawk.mobvitals.death.CorpseManager;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public final class VitalPacketListener extends PacketListenerAbstract {
     private final CorpseManager corpseManager;
@@ -39,23 +40,12 @@ public final class VitalPacketListener extends PacketListenerAbstract {
         int[] ids = destroy.getEntityIds();
         if (ids == null || ids.length == 0) return;
 
-        int recipientEntityId = -1;
-        try {
-            Object playerObj = event.getPlayer();
-            if (playerObj instanceof org.bukkit.entity.Player bp) {
-                recipientEntityId = bp.getEntityId();
-            }
-        } catch (Throwable ignored) {}
-
+        UUID recipient = recipient(event);
         List<Integer> kept = new ArrayList<>(ids.length);
         boolean interceptedAny = false;
 
         for (int id : ids) {
-            if (id == recipientEntityId) {
-                kept.add(id);
-                continue;
-            }
-            if (corpseManager.isDelayedDestroy(id)) {
+            if (corpseManager.isDelayedDestroyFor(id, recipient)) {
                 interceptedAny = true;
             } else {
                 kept.add(id);
@@ -80,7 +70,7 @@ public final class VitalPacketListener extends PacketListenerAbstract {
         int st = status.getStatus();
         if (st == 60 || st == 2) {
             int entityId = status.getEntityId();
-            if (corpseManager.isDelayedDestroy(entityId)) {
+            if (corpseManager.isDelayedDestroyFor(entityId, recipient(event))) {
                 event.setCancelled(true);
             }
         }
@@ -89,7 +79,7 @@ public final class VitalPacketListener extends PacketListenerAbstract {
     private void handleHurtAnimation(PacketSendEvent event) {
         WrapperPlayServerHurtAnimation hurt = new WrapperPlayServerHurtAnimation(event);
         int entityId = hurt.getEntityId();
-        if (corpseManager.isDelayedDestroy(entityId)) {
+        if (corpseManager.isDelayedDestroyFor(entityId, recipient(event))) {
             event.setCancelled(true);
         }
     }
@@ -97,8 +87,16 @@ public final class VitalPacketListener extends PacketListenerAbstract {
     private void handleDamageEvent(PacketSendEvent event) {
         WrapperPlayServerDamageEvent dmg = new WrapperPlayServerDamageEvent(event);
         int entityId = dmg.getEntityId();
-        if (corpseManager.isDelayedDestroy(entityId)) {
+        if (corpseManager.isDelayedDestroyFor(entityId, recipient(event))) {
             event.setCancelled(true);
+        }
+    }
+
+    private static UUID recipient(PacketSendEvent event) {
+        try {
+            return event.getUser() != null ? event.getUser().getUUID() : null;
+        } catch (Throwable ignored) {
+            return null;
         }
     }
 }

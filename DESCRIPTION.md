@@ -22,6 +22,17 @@
   <li><strong>Multi-Platform &amp; Folia Ready:</strong> Native support for Paper, Spigot, Purpur, and Folia region threading without race conditions or main-thread hitching.</li>
 </ul>
 
+<h3>Changelog v1.0.7</h3>
+<ul>
+  <li><strong>1 Popup por Hit e por Cura, Sem Poluição:</strong> Cada entidade mostra no máximo um popup de dano e um de cura ao mesmo tempo; um novo hit ou cura substitui o anterior (<code>variation-popups.max-per-entity</code>, padrão 1; 0 = sem limite).</li>
+  <li><strong>Integração com ZombieGladiators:</strong> Com os dois plugins no servidor, cada barra e cada popup do gladiador é desenhado por um plugin só, acabando com as barras e popups duplicados (requer ZombieGladiators 1.4.1). Outros plugins e admins podem esconder a barra ou os popups de uma entidade com a metadata/tag <code>mobvitals-hide-indicator</code> ou <code>mobvitals-hide-popups</code>, e trocar o nome da barra com a metadata <code>mobvitals-name</code>.</li>
+  <li><strong>Mobs com Nome Colorido:</strong> No Paper 1.21+/26.x a barra falhava com o erro "Legacy formatting codes" em mobs com nome colorido (MythicMobs, NPCs, name tags). Agora o nome aparece com as cores.</li>
+  <li><strong>Invisíveis, Vanish e Espectadores:</strong> Não ganham mais barra nem popups que entregavam a posição deles.</li>
+  <li><strong>Volta de Outro Mundo:</strong> Quem trocava de mundo e voltava deixava de ver as barras que já existiam; agora elas reaparecem.</li>
+  <li><strong>Mob Morto Congelado:</strong> Jogadores que viam o mob de longe (além da distância dos corpos) ficavam com ele parado na tela depois da morte; agora recebem a remoção normal.</li>
+  <li><strong>Outros:</strong> <code>/mv reload</code> não religa mais as barras de quem usou <code>/mv toggle</code>; removido um vazamento de memória que guardava a vida de todo mob que nascia; <code>/mv test</code> não deixa mais uma tarefa rodando para sempre; a ajuda mostra a versão correta.</li>
+</ul>
+
 <h3>Changelog v1.0.6</h3>
 <ul>
   <li><strong>Popups de Dano e Cura Sempre Somem:</strong> Corrigido o bug em que os popups ficavam parados no ar para sempre quando <code>indicators.enabled</code> (ou a chave geral <code>general.enabled</code>) estava desligado. A subida e a remoção dos popups agora funcionam de forma independente das barras de vida.</li>

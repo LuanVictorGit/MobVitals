@@ -16,9 +16,11 @@ public class DenseReductionAndPopupTest {
         int id = 1500000005;
         Component text = Component.text("-5 ❤");
         long expire = System.currentTimeMillis() + 1800L;
-        VariationPopup popup = new VariationPopup(id, null, text, expire);
+        VariationPopup popup = new VariationPopup(id, 42, true, null, text, expire);
 
         assertEquals(id, popup.getVirtualId());
+        assertEquals(42, popup.getHostEntityId());
+        assertTrue(popup.isDamage());
         assertEquals(text, popup.getComponent());
         assertEquals(expire, popup.getExpireTimeMillis());
 

@@ -11,7 +11,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
-import org.bukkit.event.entity.EntitySpawnEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.plugin.Plugin;
@@ -64,13 +63,6 @@ public final class EntityVitalListener implements Listener {
         corpseManager.onEntityDeath(living);
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onEntitySpawn(EntitySpawnEvent event) {
-        if (event.getEntity() instanceof LivingEntity living) {
-            indicatorManager.recordEntityHealth(living);
-        }
-    }
-
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerRespawn(PlayerRespawnEvent event) {
         Player player = event.getPlayer();
@@ -79,8 +71,7 @@ public final class EntityVitalListener implements Listener {
         indicatorManager.removeEntity(entityId);
         Schedulers.later(plugin, 2L, () -> {
             if (player.isOnline()) {
-                indicatorManager.recordEntityHealth(player);
-                indicatorManager.handleHealthChange(player);
+                indicatorManager.updateIndicatorHealth(player);
             }
         });
     }

@@ -2,6 +2,7 @@ package me.lhawk.mobvitals.util;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.command.CommandSender;
@@ -27,6 +28,29 @@ public final class TextUtil {
             return Component.empty();
         }
         return MINI_MESSAGE.deserialize(miniMessageText);
+    }
+
+    public static Component parse(String miniMessageText, TagResolver... resolvers) {
+        if (miniMessageText == null || miniMessageText.isEmpty()) {
+            return Component.empty();
+        }
+        return MINI_MESSAGE.deserialize(miniMessageText, resolvers);
+    }
+
+    /** MiniMessage when it parses, else legacy (§) text: newer MiniMessage throws on § color codes. */
+    public static Component parseLenient(String text) {
+        try {
+            return parse(text);
+        } catch (RuntimeException e) {
+            return fromLegacy(text);
+        }
+    }
+
+    public static Component fromLegacy(String legacyText) {
+        if (legacyText == null || legacyText.isEmpty()) {
+            return Component.empty();
+        }
+        return LEGACY_SERIALIZER.deserialize(legacyText);
     }
 
     public static void sendMessage(CommandSender sender, String miniMessageText) {

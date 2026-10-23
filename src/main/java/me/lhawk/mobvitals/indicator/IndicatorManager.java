@@ -16,7 +16,10 @@ import me.lhawk.mobvitals.util.Platform;
 import me.lhawk.mobvitals.util.Schedulers;
 import me.lhawk.mobvitals.util.TextUtil;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Animals;
@@ -24,10 +27,12 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
+import org.bukkit.metadata.MetadataValue;
 import org.bukkit.plugin.Plugin;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -41,13 +46,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
 public final class IndicatorManager {
+    /**
+     * Set as entity metadata by plugins that draw an entity's health themselves (ZombieGladiators does it for
+     * its gladiators), or as a scoreboard tag by admins: MobVitals then skips that visual for the entity.
+     */
+    public static final String HIDE_INDICATOR_KEY = "mobvitals-hide-indicator";
+    public static final String HIDE_POPUPS_KEY = "mobvitals-hide-popups";
+    /** Entity metadata holding a MiniMessage name to show in the bar instead of the custom or type name. */
+    public static final String NAME_KEY = "mobvitals-name";
+
     private final Plugin plugin;
     private final PluginConfig config;
 
     private final AtomicInteger indicatorIdCounter = new AtomicInteger(1_500_000_000);
     private final Map<Integer, HealthIndicator> activeIndicators = new ConcurrentHashMap<>();
     private final Map<Integer, VariationPopup> activePopups = new ConcurrentHashMap<>();
-    private final Map<Integer, Double> recordedHealthMap = new ConcurrentHashMap<>();
     private final Set<UUID> toggledOffPlayers = ConcurrentHashMap.newKeySet();
 
     private Schedulers.TaskHandle updateTask;
@@ -79,8 +92,6 @@ public final class IndicatorManager {
         }
         activeIndicators.clear();
         activePopups.clear();
-        recordedHealthMap.clear();
-        toggledOffPlayers.clear();
     }
 
     public boolean togglePlayer(Player player) {
@@ -122,78 +133,45 @@ public final class IndicatorManager {
         return health + Math.max(0.0, absorption);
     }
 
-    public void recordEntityHealth(LivingEntity entity) {
-        if (entity == null || !entity.isValid() || entity.isDead()) return;
-        recordedHealthMap.putIfAbsent(entity.getEntityId(), getEffectiveHealth(entity));
-    }
-
     public void onDamage(LivingEntity entity, double finalDamage) {
-        if ((!config.isIndicatorsEnabled() && !config.isPopupsEnabled()) || entity == null || !isEligibleType(entity)) return;
+        if (entity == null) return;
+        boolean popup = config.isPopupsEnabled() && finalDamage >= config.getPopupThreshold() && canShowPopups(entity);
+        boolean indicator = config.isIndicatorsEnabled() && canShowIndicator(entity);
+        if (!popup && !indicator) return;
 
-        int entityId = entity.getEntityId();
-        double currentHealth = Math.max(0.0, entity.getHealth());
-        double healthAfter = Math.max(0.0, currentHealth - finalDamage);
-        double maxHealth = getMaxHealth(entity);
-
-        recordedHealthMap.put(entityId, healthAfter);
-
-        if (finalDamage >= config.getPopupThreshold() && config.isPopupsEnabled()) {
+        if (popup) {
             spawnVariationPopup(entity, finalDamage, true);
         }
 
-        if (healthAfter > 0.0 && config.isIndicatorsEnabled()) {
-            showOrUpdateIndicator(entity, healthAfter, maxHealth);
+        double healthAfter = Math.max(0.0, entity.getHealth() - finalDamage);
+        if (healthAfter > 0.0 && indicator) {
+            showOrUpdateIndicator(entity, healthAfter, getMaxHealth(entity));
         }
     }
 
     public void onHeal(LivingEntity entity, double amount) {
-        if ((!config.isIndicatorsEnabled() && !config.isPopupsEnabled()) || entity == null || !isEligibleType(entity)) return;
+        if (entity == null) return;
+        boolean popups = config.isPopupsEnabled() && canShowPopups(entity);
+        boolean indicator = config.isIndicatorsEnabled() && canShowIndicator(entity);
+        if (!popups && !indicator) return;
 
-        int entityId = entity.getEntityId();
         double currentHealth = Math.max(0.0, entity.getHealth());
         double maxHealth = getMaxHealth(entity);
         double healthAfter = Math.min(maxHealth, currentHealth + amount);
         double actualHeal = Math.max(0.0, healthAfter - currentHealth);
 
-        recordedHealthMap.put(entityId, healthAfter);
-
-        if (actualHeal >= config.getPopupThreshold() && config.isPopupsEnabled()) {
+        if (popups && actualHeal >= config.getPopupThreshold()) {
             spawnVariationPopup(entity, actualHeal, false);
         }
 
-        if (config.isIndicatorsEnabled()) {
+        if (indicator) {
             showOrUpdateIndicator(entity, healthAfter, maxHealth);
         }
     }
 
-    public void handleHealthChange(LivingEntity entity) {
-        if (!config.isIndicatorsEnabled() || entity == null || !isEligible(entity)) return;
-
-        int entityId = entity.getEntityId();
-        double currentHealth = getEffectiveHealth(entity);
-        double maxHealth = getMaxHealth(entity);
-
-        Double previousHealthObj = recordedHealthMap.put(entityId, currentHealth);
-        double previousHealth = previousHealthObj != null ? previousHealthObj : maxHealth;
-        double diff = previousHealth - currentHealth;
-
-        if (Math.abs(diff) >= config.getPopupThreshold() && config.isPopupsEnabled()) {
-            if (diff > 0.0) {
-                spawnVariationPopup(entity, diff, true);
-            } else {
-                spawnVariationPopup(entity, -diff, false);
-            }
-        }
-
-        showOrUpdateIndicator(entity, currentHealth, maxHealth);
-    }
-
     public void updateIndicatorHealth(LivingEntity entity) {
-        if (!config.isIndicatorsEnabled() || entity == null || !isEligible(entity)) return;
-        double currentHealth = getEffectiveHealth(entity);
-        double maxHealth = getMaxHealth(entity);
-        recordedHealthMap.put(entity.getEntityId(), currentHealth);
-        showOrUpdateIndicator(entity, currentHealth, maxHealth);
+        if (!config.isIndicatorsEnabled() || entity == null || !isEligible(entity) || !canShowIndicator(entity)) return;
+        showOrUpdateIndicator(entity, getEffectiveHealth(entity), getMaxHealth(entity));
     }
 
     public void showOrUpdateIndicator(LivingEntity entity, double currentHealth, double maxHealth) {
@@ -220,7 +198,6 @@ public final class IndicatorManager {
     }
 
     public void removeEntity(int entityId) {
-        recordedHealthMap.remove(entityId);
         HealthIndicator indicator = activeIndicators.remove(entityId);
         if (indicator == null || !Platform.hasPacketEvents()) return;
         destroyForViewers(indicator);
@@ -273,7 +250,7 @@ public final class IndicatorManager {
 
     private boolean tickIndicator(HealthIndicator ind, long now, long maxDamageAgeMs) {
         LivingEntity host = ind.getHostEntity();
-        if (host == null || !host.isValid() || host.isDead() || host.getHealth() <= 0) {
+        if (host == null || !host.isValid() || host.isDead() || host.getHealth() <= 0 || !canShowIndicator(host)) {
             destroyForViewers(ind);
             return true;
         }
@@ -297,7 +274,6 @@ public final class IndicatorManager {
         double currentHealth = getEffectiveHealth(host);
         if (Math.abs(currentHealth - ind.getLastHealth()) > 0.05) {
             ind.setLastHealth(currentHealth);
-            recordedHealthMap.put(host.getEntityId(), currentHealth);
             updateMetadataForViewers(ind, host);
         }
 
@@ -310,6 +286,9 @@ public final class IndicatorManager {
 
         Location eLoc = entity.getLocation();
         if (eLoc.getWorld() == null) return;
+
+        int hostId = entity.getEntityId();
+        makeRoomForPopup(hostId, isDamage);
 
         double angle = ThreadLocalRandom.current().nextDouble(0, 2 * Math.PI);
         double dist = ThreadLocalRandom.current().nextDouble(0.25, 0.85);
@@ -326,12 +305,11 @@ public final class IndicatorManager {
 
         int popupId = getNextIndicatorId();
         long expireTime = System.currentTimeMillis() + (long) (config.getPopupDurationSeconds() * 1000.0);
-        VariationPopup popup = new VariationPopup(popupId, popupLoc, component, expireTime);
+        VariationPopup popup = new VariationPopup(popupId, hostId, isDamage, popupLoc, component, expireTime);
 
         double viewDistSq = config.getViewDistance() * config.getViewDistance();
         for (Player p : eLoc.getWorld().getPlayers()) {
-            if (entity instanceof Player hostPlayer && hostPlayer.getUniqueId().equals(p.getUniqueId())) continue;
-            if (toggledOffPlayers.contains(p.getUniqueId())) continue;
+            if (!canView(p, entity)) continue;
             if (p.getLocation().distanceSquared(eLoc) <= viewDistSq) {
                 if (popup.addViewer(p.getUniqueId())) {
                     spawnPopupForPlayer(p, popup);
@@ -342,21 +320,47 @@ public final class IndicatorManager {
         activePopups.put(popupId, popup);
     }
 
+    /** Removes the oldest popups of this kind above the entity so the new one keeps it within max-per-entity. */
+    private void makeRoomForPopup(int hostId, boolean isDamage) {
+        int max = config.getPopupMaxPerEntity();
+        if (max <= 0) return;
+
+        List<VariationPopup> same = new ArrayList<>();
+        for (VariationPopup popup : activePopups.values()) {
+            if (popup.getHostEntityId() == hostId && popup.isDamage() == isDamage) {
+                same.add(popup);
+            }
+        }
+        if (same.size() < max) return;
+
+        same.sort(Comparator.comparingInt(VariationPopup::getVirtualId));
+        for (int i = 0; i <= same.size() - max; i++) {
+            VariationPopup oldest = same.get(i);
+            if (activePopups.remove(oldest.getVirtualId(), oldest)) {
+                destroyPopupForViewers(oldest);
+            }
+        }
+    }
+
     private void updateIndicatorViewers(HealthIndicator indicator, LivingEntity host) {
         Location loc = host.getLocation();
-        if (loc.getWorld() == null) return;
+        World world = loc.getWorld();
+        if (world == null) return;
+
+        // A viewer who left or changed worlds already lost the entity client-side; forgetting them lets it respawn on return.
+        indicator.getViewers().removeIf(uid -> {
+            Player viewer = plugin.getServer().getPlayer(uid);
+            return viewer == null || viewer.getWorld() != world;
+        });
 
         double viewDistSq = config.getViewDistance() * config.getViewDistance();
 
-        for (Player p : loc.getWorld().getPlayers()) {
+        for (Player p : world.getPlayers()) {
             UUID pUid = p.getUniqueId();
-            if (host instanceof Player hostPlayer && hostPlayer.getUniqueId().equals(pUid)) continue;
-            if (toggledOffPlayers.contains(pUid)) continue;
-
-            boolean inRange = p.getLocation().distanceSquared(loc) <= viewDistSq;
+            boolean inRange = canView(p, host) && p.getLocation().distanceSquared(loc) <= viewDistSq;
             if (inRange) {
                 if (indicator.addViewer(pUid)) {
-                    spawnIndicatorForPlayer(p, indicator, host, loc, host.getHealth(), getMaxHealth(host));
+                    spawnIndicatorForPlayer(p, indicator, host, loc, indicator.getLastHealth(), indicator.getLastMaxHealth());
                 }
             } else {
                 if (indicator.removeViewer(pUid)) {
@@ -364,6 +368,14 @@ public final class IndicatorManager {
                 }
             }
         }
+    }
+
+    private boolean canView(Player viewer, LivingEntity host) {
+        if (toggledOffPlayers.contains(viewer.getUniqueId())) return false;
+        if (host instanceof Player hostPlayer) {
+            return !hostPlayer.getUniqueId().equals(viewer.getUniqueId()) && viewer.canSee(hostPlayer);
+        }
+        return true;
     }
 
     private void spawnIndicatorForPlayer(Player player, HealthIndicator indicator, LivingEntity entity, Location loc, double health, double maxHealth) {
@@ -565,15 +577,6 @@ public final class IndicatorManager {
         }
         bar.append("<reset>");
 
-        String name;
-        if (entity instanceof Player) {
-            name = entity.getName();
-        } else if (entity.getCustomName() != null && !entity.getCustomName().isEmpty()) {
-            name = entity.getCustomName();
-        } else {
-            name = formatEntityTypeName(entity.getType().name());
-        }
-
         String currentStr = (clampedHealth == (long) clampedHealth) ? String.valueOf((long) clampedHealth) : String.format(Locale.ROOT, "%.1f", clampedHealth);
         String maxStr = (clampedMax == (long) clampedMax) ? String.valueOf((long) clampedMax) : String.format(Locale.ROOT, "%.1f", clampedMax);
         String percentStr = String.valueOf((int) Math.round(fraction * 100));
@@ -588,7 +591,6 @@ public final class IndicatorManager {
         }
 
         String formatted = template
-                .replace("<name>", name)
                 .replace("<bar>", bar.toString())
                 .replace("<color>", color)
                 .replace("</color>", "<reset>")
@@ -596,7 +598,42 @@ public final class IndicatorManager {
                 .replace("<max>", maxStr)
                 .replace("<percent>", percentStr);
 
-        return TextUtil.parse(formatted);
+        // The name goes in as a component: custom names arrive with legacy § colors, which MiniMessage rejects,
+        // and may contain text that would otherwise be parsed as tags.
+        return TextUtil.parse(formatted, Placeholder.component("name", resolveName(entity)));
+    }
+
+    private Component resolveName(LivingEntity entity) {
+        for (MetadataValue value : entity.getMetadata(NAME_KEY)) {
+            String name = value.asString();
+            if (name != null && !name.isEmpty()) return TextUtil.parseLenient(name);
+        }
+        if (entity instanceof Player) {
+            return Component.text(entity.getName());
+        }
+        String customName = entity.getCustomName();
+        if (customName != null && !customName.isEmpty()) {
+            return TextUtil.fromLegacy(customName);
+        }
+        return Component.text(formatEntityTypeName(entity.getType().name()));
+    }
+
+    public boolean canShowIndicator(LivingEntity entity) {
+        return isEligibleType(entity) && isShown(entity) && !isMarked(entity, HIDE_INDICATOR_KEY);
+    }
+
+    public boolean canShowPopups(LivingEntity entity) {
+        return isEligibleType(entity) && isShown(entity) && !isMarked(entity, HIDE_POPUPS_KEY);
+    }
+
+    /** Invisible entities and spectators would be given away by a floating bar or number. */
+    private boolean isShown(LivingEntity entity) {
+        if (entity.isInvisible()) return false;
+        return !(entity instanceof Player player) || player.getGameMode() != GameMode.SPECTATOR;
+    }
+
+    private static boolean isMarked(LivingEntity entity, String key) {
+        return entity.hasMetadata(key) || entity.getScoreboardTags().contains(key);
     }
 
     public boolean isEligibleType(LivingEntity entity) {

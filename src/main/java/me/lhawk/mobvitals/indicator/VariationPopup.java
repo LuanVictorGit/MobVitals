@@ -9,13 +9,17 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class VariationPopup {
     private final int virtualId;
+    private final int hostEntityId;
+    private final boolean damage;
     private final Location location;
     private final Component component;
     private final long expireTimeMillis;
     private final Set<UUID> viewers = ConcurrentHashMap.newKeySet();
 
-    public VariationPopup(int virtualId, Location location, Component component, long expireTimeMillis) {
+    public VariationPopup(int virtualId, int hostEntityId, boolean damage, Location location, Component component, long expireTimeMillis) {
         this.virtualId = virtualId;
+        this.hostEntityId = hostEntityId;
+        this.damage = damage;
         this.location = location;
         this.component = component;
         this.expireTimeMillis = expireTimeMillis;
@@ -23,6 +27,14 @@ public final class VariationPopup {
 
     public int getVirtualId() {
         return virtualId;
+    }
+
+    public int getHostEntityId() {
+        return hostEntityId;
+    }
+
+    public boolean isDamage() {
+        return damage;
     }
 
     public Location getLocation() {

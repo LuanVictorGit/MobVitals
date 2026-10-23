@@ -12,12 +12,12 @@ All visual indicators and corpse persistence are rendered on the client side wit
 ---
 
 ## 2. Current Version
-**Version:** `1.0.6`
+**Version:** `1.0.7`
 
 ---
 
 ## 3. Project Status
-**Status:** `Active / Published on MineBuilders (v1.0.6)`
+**Status:** `Active / Published on MineBuilders (v1.0.7)`
 **MineBuilders Slug:** `mobvitals-health-corpses-1-16-26-3`
 **MineBuilders ID:** `cdf014fb-8da6-4fa2-8ab3-7978fe9aea61`
 
@@ -121,6 +121,8 @@ MobVitals/
 6. **Smooth Dissolution Animation:** Expiring corpses burst into thematic finale particles and custom audio before the client destroys the entity, guaranteeing no abrupt visual cuts or lingering ghost models.
 7. **Thematic Death Profiles:** Custom particle and sound profiles for 11 entity categories (`UNDEAD`, `SKELETAL`, `INFERNAL`, `CREEPER`, `ENDER`, `ARACHNID`, `AQUATIC`, `VILLAGER_ILLAGER`, `BOSS`, `PLAYER`, `ANIMAL`).
 8. **Client Visibility Toggle:** Individual players can toggle health indicators on/off with `/mobvitals toggle`.
+9. **One Popup per Hit and Heal:** `variation-popups.max-per-entity` (default `1`) keeps a single damage and a single heal popup above each entity; a new hit or heal replaces the older one.
+10. **Plugin Integration:** Entities carrying the metadata or scoreboard tag `mobvitals-hide-indicator` get no bar and `mobvitals-hide-popups` no popups; the metadata `mobvitals-name` (MiniMessage) replaces the name in the bar. ZombieGladiators 1.4.1+ uses this so a gladiator is never drawn twice.
 
 ---
 
@@ -142,6 +144,7 @@ The `config.yml` file contains full English explanations for every option:
 - `indicators.show-only-when-damaged`: Auto-hides overhead health bars until damaged/healed.
 - `indicators.damaged-display-seconds`: Duration in seconds overhead bars remain visible.
 - `indicators.variation-popups`: Floating damage/heal difference popups toggle and formatting.
+- `variation-popups.max-per-entity`: Popups of each kind shown at once per entity (default `1`, `0` = no limit).
 - `death-animations.dense-corpse-reduction`: Enables smart duration reduction for clustered deaths.
 - `death-animations.dense-radius`: Radius in blocks to detect corpse clusters.
 - `death-animations.corpse-duration-seconds`: Base time corpses remain lying down.
@@ -191,6 +194,14 @@ The plugin includes authentic in-game verification captures stored in [`screensh
 ---
 
 ## 15. Version History
+- **1.0.7 (2026-10-23):**
+  - One popup per hit and per heal, without clutter: each entity shows at most one damage and one heal popup at a time; a new hit or heal replaces the older one (`variation-popups.max-per-entity`, default `1`, `0` = no limit).
+  - ZombieGladiators integration: with both plugins installed every gladiator visual is drawn by one plugin only, ending the duplicated bars and popups. Other plugins (and admins, as scoreboard tags) can hide MobVitals on an entity with `mobvitals-hide-indicator` / `mobvitals-hide-popups`, and name its bar with the `mobvitals-name` metadata.
+  - Fixed health bars failing with "Legacy formatting codes have been detected" on Paper 1.21+/26.x for mobs with colored custom names; the name now keeps its colors, and tag-like text in names is shown as typed.
+  - Invisible players and mobs, vanished players and spectators no longer get a bar or popups that gave away where they are.
+  - Players returning from another world see existing health bars again.
+  - Players tracking a dying mob from beyond the corpse view distance now get the normal removal instead of keeping a frozen dead mob on screen.
+  - `/mv reload` keeps the players who turned bars off with `/mv toggle`; removed a map that kept the health of every spawned mob forever (memory leak); `/mv test` no longer leaves a task running; the help header shows the real version.
 - **1.0.6 (2026-10-23):**
   - Fixed damage/heal popups staying frozen in the air forever when `indicators.enabled` (or the `general.enabled` master switch) was off: popup drift and removal now run on their own, independently of health indicators.
   - Fixed a player with an active health bar changing worlds (portal, teleport, RTP) throwing an error on every tick, which froze every popup on the server while that bar was alive; the bar is now respawned in the new world.
