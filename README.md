@@ -12,12 +12,12 @@ All visual indicators and corpse persistence are rendered on the client side wit
 ---
 
 ## 2. Current Version
-**Version:** `1.0.5`
+**Version:** `1.0.6`
 
 ---
 
 ## 3. Project Status
-**Status:** `Active / Published on MineBuilders (v1.0.5)`
+**Status:** `Active / Published on MineBuilders (v1.0.6)`
 **MineBuilders Slug:** `mobvitals-health-corpses-1-16-26-3`
 **MineBuilders ID:** `cdf014fb-8da6-4fa2-8ab3-7978fe9aea61`
 
@@ -191,6 +191,11 @@ The plugin includes authentic in-game verification captures stored in [`screensh
 ---
 
 ## 15. Version History
+- **1.0.6 (2026-10-23):**
+  - Fixed damage/heal popups staying frozen in the air forever when `indicators.enabled` (or the `general.enabled` master switch) was off: popup drift and removal now run on their own, independently of health indicators.
+  - Fixed a player with an active health bar changing worlds (portal, teleport, RTP) throwing an error on every tick, which froze every popup on the server while that bar was alive; the bar is now respawned in the new world.
+  - One failing health bar or popup no longer stalls the others: the faulty entry is removed and logged to the console.
+  - `general.enabled: false` now also turns popups off.
 - **1.0.5 (2026-10-17):**
   - Enhanced death animation flow: permitted natural death event packets (status 3) during the initial 2 ticks (~100 ms) so mob bodies naturally tilt and lie flat on the ground.
   - Anchored corpse ground teleportation at 2 ticks with a 5-tick (~250 ms) stability re-confirmation directly at ambient particle coordinates, removing the red damage overlay.

@@ -22,6 +22,14 @@
   <li><strong>Multi-Platform &amp; Folia Ready:</strong> Native support for Paper, Spigot, Purpur, and Folia region threading without race conditions or main-thread hitching.</li>
 </ul>
 
+<h3>Changelog v1.0.6</h3>
+<ul>
+  <li><strong>Popups de Dano e Cura Sempre Somem:</strong> Corrigido o bug em que os popups ficavam parados no ar para sempre quando <code>indicators.enabled</code> (ou a chave geral <code>general.enabled</code>) estava desligado. A subida e a remoção dos popups agora funcionam de forma independente das barras de vida.</li>
+  <li><strong>Troca de Mundo Sem Travar:</strong> Um jogador com barra de vida ativa que trocava de mundo (portal, teleporte, RTP) gerava um erro a cada tick que congelava todos os popups do servidor enquanto a barra existisse. A barra agora é recriada no novo mundo.</li>
+  <li><strong>Atualização Resiliente:</strong> Uma falha em uma única barra de vida ou popup não interrompe mais os demais; o item com problema é removido e registrado no console.</li>
+  <li><strong>Chave Geral Respeitada:</strong> Com <code>general.enabled: false</code>, os popups também deixam de aparecer.</li>
+</ul>
+
 <h3>Changelog v1.0.5</h3>
 <ul>
   <li><strong>Fluxo de Morte Suave &amp; Âncora em 2 Ticks (~100ms - 250ms):</strong> Permitido o envio do status 3 para que a entidade execute sua animação natural de tombar ao solo antes de ser ancorada aos 2 ticks com estabilização aos 5 ticks (250ms) junto às partículas ambientes.</li>

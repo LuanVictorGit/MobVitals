@@ -38,6 +38,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
 
 public final class IndicatorManager {
     private final Plugin plugin;
@@ -226,54 +227,82 @@ public final class IndicatorManager {
     }
 
     private void tick() {
-        if (!config.isIndicatorsEnabled() || !Platform.hasPacketEvents()) return;
+        if (!Platform.hasPacketEvents()) return;
 
         long now = System.currentTimeMillis();
+        // Popups are spawned even when indicators are off, so they expire first and on their own:
+        // a disabled or failing indicator pass must never leave popups frozen in the air.
+        tickPopups(now);
+        if (config.isIndicatorsEnabled()) {
+            tickIndicators(now);
+        }
+    }
+
+    private void tickPopups(long now) {
+        activePopups.entrySet().removeIf(entry -> {
+            VariationPopup popup = entry.getValue();
+            try {
+                if (now < popup.getExpireTimeMillis()) {
+                    Location pLoc = popup.getLocation();
+                    pLoc.add(0.0, 0.038, 0.0);
+                    teleportPopupForViewers(popup, pLoc);
+                    return false;
+                }
+            } catch (Throwable t) {
+                plugin.getLogger().log(Level.WARNING, "Failed to animate variation popup, removing it early", t);
+            }
+            destroyPopupForViewers(popup);
+            return true;
+        });
+    }
+
+    private void tickIndicators(long now) {
         long maxDamageAgeMs = (long) (config.getDamagedDisplaySeconds() * 1000.0);
 
         activeIndicators.entrySet().removeIf(entry -> {
             HealthIndicator ind = entry.getValue();
-            LivingEntity host = ind.getHostEntity();
-            if (host == null || !host.isValid() || host.isDead() || host.getHealth() <= 0) {
+            try {
+                return tickIndicator(ind, now, maxDamageAgeMs);
+            } catch (Throwable t) {
+                plugin.getLogger().log(Level.WARNING, "Failed to update health indicator, removing it", t);
                 destroyForViewers(ind);
                 return true;
             }
-
-            if (config.isShowOnlyWhenDamaged() && (now - ind.getLastDamageTime() > maxDamageAgeMs)) {
-                destroyForViewers(ind);
-                return true;
-            }
-
-            Location currentLoc = host.getLocation();
-            Location lastLoc = ind.getLastLocation();
-            if (lastLoc == null || lastLoc.distanceSquared(currentLoc) > 0.002) {
-                teleportIndicatorForViewers(ind, host, currentLoc);
-                ind.setLastLocation(currentLoc.clone());
-            }
-
-            double currentHealth = getEffectiveHealth(host);
-            if (Math.abs(currentHealth - ind.getLastHealth()) > 0.05) {
-                ind.setLastHealth(currentHealth);
-                recordedHealthMap.put(host.getEntityId(), currentHealth);
-                updateMetadataForViewers(ind, host);
-            }
-
-            updateIndicatorViewers(ind, host);
-            return false;
         });
+    }
 
-        activePopups.entrySet().removeIf(entry -> {
-            VariationPopup popup = entry.getValue();
-            if (now >= popup.getExpireTimeMillis()) {
-                destroyPopupForViewers(popup);
-                return true;
-            }
+    private boolean tickIndicator(HealthIndicator ind, long now, long maxDamageAgeMs) {
+        LivingEntity host = ind.getHostEntity();
+        if (host == null || !host.isValid() || host.isDead() || host.getHealth() <= 0) {
+            destroyForViewers(ind);
+            return true;
+        }
 
-            Location pLoc = popup.getLocation();
-            pLoc.add(0.0, 0.038, 0.0);
-            teleportPopupForViewers(popup, pLoc);
-            return false;
-        });
+        if (config.isShowOnlyWhenDamaged() && (now - ind.getLastDamageTime() > maxDamageAgeMs)) {
+            destroyForViewers(ind);
+            return true;
+        }
+
+        Location currentLoc = host.getLocation();
+        Location lastLoc = ind.getLastLocation();
+        if (lastLoc != null && lastLoc.getWorld() != currentLoc.getWorld()) {
+            // Host changed worlds: drop it for the old world's viewers, updateIndicatorViewers respawns it.
+            destroyForViewers(ind);
+            ind.setLastLocation(currentLoc.clone());
+        } else if (lastLoc == null || lastLoc.distanceSquared(currentLoc) > 0.002) {
+            teleportIndicatorForViewers(ind, host, currentLoc);
+            ind.setLastLocation(currentLoc.clone());
+        }
+
+        double currentHealth = getEffectiveHealth(host);
+        if (Math.abs(currentHealth - ind.getLastHealth()) > 0.05) {
+            ind.setLastHealth(currentHealth);
+            recordedHealthMap.put(host.getEntityId(), currentHealth);
+            updateMetadataForViewers(ind, host);
+        }
+
+        updateIndicatorViewers(ind, host);
+        return false;
     }
 
     public void spawnVariationPopup(LivingEntity entity, double amount, boolean isDamage) {

@@ -19,6 +19,14 @@ Above their heads, sleek real-time health indicators and floating damage/heal po
 [*] [B]Multi-Platform & Folia Ready:[/B] Native support for Paper, Spigot, Purpur, and Folia region threading without race conditions or main-thread hitching.
 [/LIST]
 
+[B][SIZE=5]🔧 Changelog v1.0.6[/SIZE][/B]
+[LIST]
+[*] [B]Popups Always Disappear:[/B] Fixed damage/heal popups staying frozen in the air forever when [FONT=Courier New]indicators.enabled[/FONT] (or the [FONT=Courier New]general.enabled[/FONT] master switch) was off. Popup drift and removal now run independently of health bars.
+[*] [B]World Changes No Longer Freeze Popups:[/B] A player with an active health bar changing worlds (portal, teleport, RTP) threw an error every tick that froze every popup on the server while the bar was alive. The bar is now respawned in the new world.
+[*] [B]Resilient Updates:[/B] One failing health bar or popup no longer stalls the others; the faulty entry is removed and logged.
+[*] [B]Master Switch Respected:[/B] [FONT=Courier New]general.enabled: false[/FONT] now also turns popups off.
+[/LIST]
+
 [B][SIZE=5]🔧 Changelog v1.0.5[/SIZE][/B]
 [LIST]
 [*] [B]Smooth Death Fall & 2-Tick Anchor (~100ms - 250ms):[/B] Permitted natural death event packets (status 3) so entities gracefully tilt and lie flat onto the ground before anchoring at 2 ticks with a 5-tick (~250ms) stability re-confirmation directly at ambient particle coordinates.

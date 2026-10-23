@@ -264,7 +264,7 @@ public final class PluginConfig {
     }
 
     public boolean isPopupsEnabled() {
-        return popupsEnabled;
+        return generalEnabled && popupsEnabled;
     }
 
     public double getPopupDurationSeconds() {
