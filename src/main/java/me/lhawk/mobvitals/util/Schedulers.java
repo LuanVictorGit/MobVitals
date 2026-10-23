@@ -20,6 +20,25 @@ public final class Schedulers {
         return Platform.isFolia();
     }
 
+    private static final Method OWNED_BY_REGION = ownedByRegionMethod();
+
+    private static Method ownedByRegionMethod() {
+        try {
+            return org.bukkit.Server.class.getMethod("isOwnedByCurrentRegion", Entity.class);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    public static boolean ownsEntity(Entity entity) {
+        if (entity == null || !folia() || OWNED_BY_REGION == null) return true;
+        try {
+            return (Boolean) OWNED_BY_REGION.invoke(Bukkit.getServer(), entity);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
     public static void run(Plugin plugin, Runnable task) {
         if (folia()) {
             try {
@@ -57,16 +76,58 @@ public final class Schedulers {
     }
 
     public static void runForEntity(Plugin plugin, Entity entity, Runnable task) {
+        runForEntity(plugin, entity, 1L, task);
+    }
+
+    public static void runForEntity(Plugin plugin, Entity entity, long delayTicks, Runnable task) {
+        long delay = Math.max(1L, delayTicks);
         if (folia() && entity != null) {
             try {
                 Method getScheduler = entity.getClass().getMethod("getScheduler");
                 Object es = getScheduler.invoke(entity);
                 Method m = es.getClass().getMethod("execute", Plugin.class, Runnable.class, Runnable.class, long.class);
-                m.invoke(es, plugin, task, null, 1L);
+                m.invoke(es, plugin, task, null, delay);
                 return;
             } catch (Throwable ignored) {}
         }
-        Bukkit.getScheduler().runTask(plugin, task);
+        Bukkit.getScheduler().runTaskLater(plugin, task, delay);
+    }
+
+    public static TaskHandle timerForEntity(Plugin plugin, Entity entity, long delayTicks, long periodTicks, Runnable task, Runnable retired) {
+        long delay = Math.max(1L, delayTicks);
+        long period = Math.max(1L, periodTicks);
+        if (folia() && entity != null) {
+            try {
+                Method getScheduler = entity.getClass().getMethod("getScheduler");
+                Object es = getScheduler.invoke(entity);
+                Method m = es.getClass().getMethod("runAtFixedRate", Plugin.class, Consumer.class, Runnable.class, long.class, long.class);
+                Object scheduled = m.invoke(es, plugin, (Consumer<Object>) t -> task.run(), retired, delay, period);
+                return () -> cancelScheduled(scheduled);
+            } catch (Throwable ignored) {}
+        }
+        BukkitTask bt = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (entity == null || !entity.isValid()) {
+                if (retired != null) retired.run();
+                return;
+            }
+            task.run();
+        }, delay, period);
+        return bt::cancel;
+    }
+
+    public static TaskHandle timerAt(Plugin plugin, Location loc, long delayTicks, long periodTicks, Runnable task) {
+        long delay = Math.max(1L, delayTicks);
+        long period = Math.max(1L, periodTicks);
+        if (folia() && loc != null && loc.getWorld() != null) {
+            try {
+                Object rs = Bukkit.getServer().getClass().getMethod("getRegionScheduler").invoke(Bukkit.getServer());
+                Method m = rs.getClass().getMethod("runAtFixedRate", Plugin.class, Location.class, Consumer.class, long.class, long.class);
+                Object scheduled = m.invoke(rs, plugin, loc, (Consumer<Object>) t -> task.run(), delay, period);
+                return () -> cancelScheduled(scheduled);
+            } catch (Throwable ignored) {}
+        }
+        BukkitTask bt = Bukkit.getScheduler().runTaskTimer(plugin, task, delay, period);
+        return bt::cancel;
     }
 
     public static TaskHandle later(Plugin plugin, long ticks, Runnable task) {

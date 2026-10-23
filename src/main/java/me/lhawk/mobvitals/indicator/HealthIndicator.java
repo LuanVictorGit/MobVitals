@@ -1,5 +1,6 @@
 package me.lhawk.mobvitals.indicator;
 
+import me.lhawk.mobvitals.util.Schedulers;
 import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;
 
@@ -17,6 +18,7 @@ public final class HealthIndicator {
     private double lastMaxHealth;
     private long lastDamageTime;
     private final Set<UUID> viewers = ConcurrentHashMap.newKeySet();
+    private volatile Schedulers.TaskHandle task;
 
     public HealthIndicator(LivingEntity hostEntity, int virtualIndicatorId, Location initialLocation, double health, double maxHealth) {
         this.hostEntityId = hostEntity != null ? hostEntity.getEntityId() : 0;
@@ -74,6 +76,16 @@ public final class HealthIndicator {
 
     public Set<UUID> getViewers() {
         return viewers;
+    }
+
+    public void setTask(Schedulers.TaskHandle task) {
+        this.task = task;
+    }
+
+    public void cancelTask() {
+        Schedulers.TaskHandle current = task;
+        task = null;
+        if (current != null) current.cancel();
     }
 
     public boolean addViewer(UUID uuid) {

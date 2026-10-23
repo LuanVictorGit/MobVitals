@@ -66,8 +66,9 @@ indicators:
   boss-format: "<light_purple><bold><name></bold></light_purple> <bar> <color><current><reset><dark_gray>/</dark_gray><gray><max></gray> <red>❤</red> <yellow>(<percent>%)</yellow>"
   # Entity types that should NEVER display a health indicator.
   # Single entities can be excluded too: the scoreboard tag (or plugin metadata) "mobvitals-hide-indicator"
-  # removes the bar and "mobvitals-hide-popups" the popups. ZombieGladiators sets them on the gladiators it
-  # already draws itself, so each one keeps a single bar and one popup per hit.
+  # removes the bar and "mobvitals-hide-popups" the popups.
+  # While ZombieGladiators is installed its gladiators are always skipped (bar, popups and corpse), because
+  # it draws them itself; every other mob is handled as usual.
   blacklist:
     - "ARMOR_STAND"
     - "ITEM_FRAME"

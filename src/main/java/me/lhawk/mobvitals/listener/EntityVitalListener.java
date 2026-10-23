@@ -33,7 +33,7 @@ public final class EntityVitalListener implements Listener {
             if (finalDamage > 0.0) {
                 indicatorManager.onDamage(living, finalDamage);
             }
-            Schedulers.later(plugin, 1L, () -> {
+            Schedulers.runForEntity(plugin, living, () -> {
                 if (living.isValid() && !living.isDead()) {
                     indicatorManager.updateIndicatorHealth(living);
                 }
@@ -48,7 +48,7 @@ public final class EntityVitalListener implements Listener {
             if (amount > 0.0) {
                 indicatorManager.onHeal(living, amount);
             }
-            Schedulers.later(plugin, 1L, () -> {
+            Schedulers.runForEntity(plugin, living, () -> {
                 if (living.isValid() && !living.isDead()) {
                     indicatorManager.updateIndicatorHealth(living);
                 }
@@ -56,7 +56,7 @@ public final class EntityVitalListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEntityDeath(EntityDeathEvent event) {
         LivingEntity living = event.getEntity();
         indicatorManager.handleEntityDeath(living);
@@ -69,7 +69,7 @@ public final class EntityVitalListener implements Listener {
         int entityId = player.getEntityId();
         corpseManager.removeCorpse(entityId);
         indicatorManager.removeEntity(entityId);
-        Schedulers.later(plugin, 2L, () -> {
+        Schedulers.runForEntity(plugin, player, 2L, () -> {
             if (player.isOnline()) {
                 indicatorManager.updateIndicatorHealth(player);
             }

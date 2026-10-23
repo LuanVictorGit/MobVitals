@@ -37,7 +37,6 @@ public final class TextUtil {
         return MINI_MESSAGE.deserialize(miniMessageText, resolvers);
     }
 
-    /** MiniMessage when it parses, else legacy (§) text: newer MiniMessage throws on § color codes. */
     public static Component parseLenient(String text) {
         try {
             return parse(text);

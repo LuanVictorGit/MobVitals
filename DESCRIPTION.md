@@ -22,6 +22,15 @@
   <li><strong>Multi-Platform &amp; Folia Ready:</strong> Native support for Paper, Spigot, Purpur, and Folia region threading without race conditions or main-thread hitching.</li>
 </ul>
 
+<h3>Changelog v1.0.8</h3>
+<ul>
+  <li><strong>ZombieGladiators Detectado Automaticamente:</strong> Com o ZombieGladiators no servidor, o MobVitals ignora totalmente os gladiadores (sem barra de vida, popups ou animação de corpo), deixando tudo para o ZombieGladiators. Funciona com qualquer versão do ZombieGladiators, no Paper, Spigot, Purpur e Folia; os demais mobs continuam normais.</li>
+  <li><strong>Corpo no Chão:</strong> O corpo fica deitado no chão logo abaixo de onde o mob morreu; mobs mortos no ar ou no meio do knockback não ficam mais flutuando, e nada mais mexe o corpo depois de deitado.</li>
+  <li><strong>Sem Empurrão e Sem Vermelho:</strong> O corpo mantém as cores naturais (sem o vermelho da morte) e não empurra mais os jogadores: hitbox mínima e o mob morto deixa de colidir no servidor. Funciona também no Folia.</li>
+  <li><strong>Folia de Verdade:</strong> Barras de vida e corpos agora rodam na thread da região certa. Antes o Folia gerava erros "Thread failed main thread check", as barras sumiam logo depois de aparecer e os corpos quebravam.</li>
+  <li><strong>Morte Cancelada:</strong> Se outro plugin cancelar a morte (Paper), o mob vivo não vira mais um corpo.</li>
+</ul>
+
 <h3>Changelog v1.0.7</h3>
 <ul>
   <li><strong>1 Popup por Hit e por Cura, Sem Poluição:</strong> Cada entidade mostra no máximo um popup de dano e um de cura ao mesmo tempo; um novo hit ou cura substitui o anterior (<code>variation-popups.max-per-entity</code>, padrão 1; 0 = sem limite).</li>
@@ -184,7 +193,7 @@ corpses:
 <h3>10. Troubleshooting &amp; FAQ</h3>
 <details>
   <summary><strong>Do dead mob bodies block arrows, attacks, or player movement?</strong></summary>
-  <p>No. When an entity dies, its client-side health is zeroed out and its pose is set to dying. In vanilla Minecraft client logic, entities with zero health have zero collision and pass through all player crosshair clicks and projectiles.</p>
+  <p>No. The real entity is already gone on the server, so arrows and attacks pass through, and the body players see uses the sleeping pose with a tiny hitbox, while the dying mob stops colliding during its death animation. Corpses never push players, on Paper, Spigot, Purpur and Folia.</p>
 </details>
 <details>
   <summary><strong>Can players disable health bars if they prefer clean vanilla visuals?</strong></summary>

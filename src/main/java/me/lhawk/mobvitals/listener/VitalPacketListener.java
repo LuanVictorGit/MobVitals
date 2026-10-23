@@ -3,18 +3,33 @@ package me.lhawk.mobvitals.listener;
 import com.github.retrooper.packetevents.event.PacketListenerAbstract;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.event.PacketSendEvent;
+import com.github.retrooper.packetevents.netty.buffer.ByteBufHelper;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDamageEvent;
+import com.github.retrooper.packetevents.protocol.packettype.PacketTypeCommon;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityStatus;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerHurtAnimation;
 import me.lhawk.mobvitals.death.CorpseManager;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public final class VitalPacketListener extends PacketListenerAbstract {
+    private static final Set<PacketTypeCommon> FROZEN_FOR_CORPSES = Set.of(
+            PacketType.Play.Server.ENTITY_RELATIVE_MOVE,
+            PacketType.Play.Server.ENTITY_RELATIVE_MOVE_AND_ROTATION,
+            PacketType.Play.Server.ENTITY_ROTATION,
+            PacketType.Play.Server.ENTITY_HEAD_LOOK,
+            PacketType.Play.Server.ENTITY_VELOCITY,
+            PacketType.Play.Server.ENTITY_TELEPORT,
+            PacketType.Play.Server.ENTITY_POSITION_SYNC,
+            PacketType.Play.Server.ENTITY_METADATA,
+            PacketType.Play.Server.ENTITY_EQUIPMENT,
+            PacketType.Play.Server.ENTITY_ANIMATION,
+            PacketType.Play.Server.HURT_ANIMATION,
+            PacketType.Play.Server.DAMAGE_EVENT
+    );
+
     private final CorpseManager corpseManager;
 
     public VitalPacketListener(CorpseManager corpseManager) {
@@ -24,14 +39,19 @@ public final class VitalPacketListener extends PacketListenerAbstract {
 
     @Override
     public void onPacketSend(PacketSendEvent event) {
-        if (event.getPacketType() == PacketType.Play.Server.DESTROY_ENTITIES) {
+        if (!corpseManager.hasCorpseBodies()) return;
+
+        PacketTypeCommon type = event.getPacketType();
+        if (type == PacketType.Play.Server.DESTROY_ENTITIES) {
             handleDestroyEntities(event);
-        } else if (event.getPacketType() == PacketType.Play.Server.ENTITY_STATUS) {
-            handleEntityStatus(event);
-        } else if (event.getPacketType() == PacketType.Play.Server.HURT_ANIMATION) {
-            handleHurtAnimation(event);
-        } else if (event.getPacketType() == PacketType.Play.Server.DAMAGE_EVENT) {
-            handleDamageEvent(event);
+        } else if (type == PacketType.Play.Server.ENTITY_STATUS) {
+            if (corpseManager.isDelayedDestroyFor(peekEntityId(event, false), recipient(event))) {
+                event.setCancelled(true);
+            }
+        } else if (FROZEN_FOR_CORPSES.contains(type)) {
+            if (corpseManager.isDelayedDestroyFor(peekEntityId(event, true), recipient(event))) {
+                event.setCancelled(true);
+            }
         }
     }
 
@@ -65,30 +85,15 @@ public final class VitalPacketListener extends PacketListenerAbstract {
         }
     }
 
-    private void handleEntityStatus(PacketSendEvent event) {
-        WrapperPlayServerEntityStatus status = new WrapperPlayServerEntityStatus(event);
-        int st = status.getStatus();
-        if (st == 60 || st == 2) {
-            int entityId = status.getEntityId();
-            if (corpseManager.isDelayedDestroyFor(entityId, recipient(event))) {
-                event.setCancelled(true);
-            }
-        }
-    }
-
-    private void handleHurtAnimation(PacketSendEvent event) {
-        WrapperPlayServerHurtAnimation hurt = new WrapperPlayServerHurtAnimation(event);
-        int entityId = hurt.getEntityId();
-        if (corpseManager.isDelayedDestroyFor(entityId, recipient(event))) {
-            event.setCancelled(true);
-        }
-    }
-
-    private void handleDamageEvent(PacketSendEvent event) {
-        WrapperPlayServerDamageEvent dmg = new WrapperPlayServerDamageEvent(event);
-        int entityId = dmg.getEntityId();
-        if (corpseManager.isDelayedDestroyFor(entityId, recipient(event))) {
-            event.setCancelled(true);
+    private static int peekEntityId(PacketSendEvent event, boolean varInt) {
+        Object buffer = event.getByteBuf();
+        int index = ByteBufHelper.readerIndex(buffer);
+        try {
+            return varInt ? ByteBufHelper.readVarInt(buffer) : ByteBufHelper.readInt(buffer);
+        } catch (Throwable ignored) {
+            return Integer.MIN_VALUE;
+        } finally {
+            ByteBufHelper.readerIndex(buffer, index);
         }
     }
 

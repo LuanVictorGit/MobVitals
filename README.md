@@ -12,12 +12,12 @@ All visual indicators and corpse persistence are rendered on the client side wit
 ---
 
 ## 2. Current Version
-**Version:** `1.0.7`
+**Version:** `1.0.8`
 
 ---
 
 ## 3. Project Status
-**Status:** `Active / Published on MineBuilders (v1.0.7)`
+**Status:** `Active / Published on MineBuilders (v1.0.8)`
 **MineBuilders Slug:** `mobvitals-health-corpses-1-16-26-3`
 **MineBuilders ID:** `cdf014fb-8da6-4fa2-8ab3-7978fe9aea61`
 
@@ -122,7 +122,7 @@ MobVitals/
 7. **Thematic Death Profiles:** Custom particle and sound profiles for 11 entity categories (`UNDEAD`, `SKELETAL`, `INFERNAL`, `CREEPER`, `ENDER`, `ARACHNID`, `AQUATIC`, `VILLAGER_ILLAGER`, `BOSS`, `PLAYER`, `ANIMAL`).
 8. **Client Visibility Toggle:** Individual players can toggle health indicators on/off with `/mobvitals toggle`.
 9. **One Popup per Hit and Heal:** `variation-popups.max-per-entity` (default `1`) keeps a single damage and a single heal popup above each entity; a new hit or heal replaces the older one.
-10. **Plugin Integration:** Entities carrying the metadata or scoreboard tag `mobvitals-hide-indicator` get no bar and `mobvitals-hide-popups` no popups; the metadata `mobvitals-name` (MiniMessage) replaces the name in the bar. ZombieGladiators 1.4.1+ uses this so a gladiator is never drawn twice.
+10. **Plugin Integration:** While ZombieGladiators is installed its gladiators are ignored entirely (bar, popups, corpse), since it draws them itself. Other entities carrying the metadata or scoreboard tag `mobvitals-hide-indicator` get no bar and `mobvitals-hide-popups` no popups; the metadata `mobvitals-name` (MiniMessage) replaces the name in the bar.
 
 ---
 
@@ -194,6 +194,12 @@ The plugin includes authentic in-game verification captures stored in [`screensh
 ---
 
 ## 15. Version History
+- **1.0.8 (2026-10-23):**
+  - MobVitals detects ZombieGladiators on its own and ignores its gladiators completely (no health bar, popups or corpse animation), with any ZombieGladiators version, on Paper, Spigot, Purpur and Folia. Gladiators are recognised by the persistent `zombiegladiators:gladiator` mark, so nothing is needed from ZombieGladiators.
+  - Corpses lie on the ground right below where the mob died: a mob killed mid-air or mid-knockback no longer floats. From the death on, the server's own movement, metadata and death packets for it are dropped for corpse viewers, so nothing moves it again.
+  - Corpses keep their natural colors (no more red death tint) and no longer push players: the body uses the sleeping pose with its health kept, which gives it a tiny hitbox, and the dying mob stops colliding on the server during its death animation. The scoreboard team used for this is gone, so it also works on Folia.
+  - Folia: health bars now update on their entity's own thread and corpses on their region's thread. Before, Folia threw "Thread failed main thread check", bars vanished right after appearing and corpses broke.
+  - A death cancelled by another plugin (Paper) no longer leaves a corpse of a mob that is still alive.
 - **1.0.7 (2026-10-23):**
   - One popup per hit and per heal, without clutter: each entity shows at most one damage and one heal popup at a time; a new hit or heal replaces the older one (`variation-popups.max-per-entity`, default `1`, `0` = no limit).
   - ZombieGladiators integration: with both plugins installed every gladiator visual is drawn by one plugin only, ending the duplicated bars and popups. Other plugins (and admins, as scoreboard tags) can hide MobVitals on an entity with `mobvitals-hide-indicator` / `mobvitals-hide-popups`, and name its bar with the `mobvitals-name` metadata.

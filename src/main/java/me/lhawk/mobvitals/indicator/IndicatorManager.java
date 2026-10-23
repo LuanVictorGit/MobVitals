@@ -12,6 +12,7 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
 import me.lhawk.mobvitals.config.PluginConfig;
+import me.lhawk.mobvitals.util.GladiatorHook;
 import me.lhawk.mobvitals.util.Platform;
 import me.lhawk.mobvitals.util.Schedulers;
 import me.lhawk.mobvitals.util.TextUtil;
@@ -46,13 +47,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
 public final class IndicatorManager {
-    /**
-     * Set as entity metadata by plugins that draw an entity's health themselves (ZombieGladiators does it for
-     * its gladiators), or as a scoreboard tag by admins: MobVitals then skips that visual for the entity.
-     */
     public static final String HIDE_INDICATOR_KEY = "mobvitals-hide-indicator";
     public static final String HIDE_POPUPS_KEY = "mobvitals-hide-popups";
-    /** Entity metadata holding a MiniMessage name to show in the bar instead of the custom or type name. */
     public static final String NAME_KEY = "mobvitals-name";
 
     private final Plugin plugin;
@@ -73,7 +69,7 @@ public final class IndicatorManager {
     public void start() {
         stop();
         long interval = config.getUpdateIntervalTicks();
-        updateTask = Schedulers.timer(plugin, 2L, interval, this::tick);
+        updateTask = Schedulers.timer(plugin, 2L, interval, this::tickPopups);
     }
 
     public void stop() {
@@ -82,10 +78,11 @@ public final class IndicatorManager {
             updateTask = null;
         }
 
+        for (HealthIndicator indicator : activeIndicators.values()) {
+            indicator.cancelTask();
+            if (Platform.hasPacketEvents()) destroyForViewers(indicator);
+        }
         if (Platform.hasPacketEvents()) {
-            for (HealthIndicator indicator : activeIndicators.values()) {
-                destroyForViewers(indicator);
-            }
             for (VariationPopup popup : activePopups.values()) {
                 destroyPopupForViewers(popup);
             }
@@ -180,9 +177,12 @@ public final class IndicatorManager {
         int entityId = entity.getEntityId();
         HealthIndicator indicator = activeIndicators.get(entityId);
         if (indicator == null) {
-            indicator = new HealthIndicator(entity, getNextIndicatorId(), entity.getLocation(), currentHealth, maxHealth);
-            activeIndicators.put(entityId, indicator);
-            updateIndicatorViewers(indicator, entity);
+            HealthIndicator created = new HealthIndicator(entity, getNextIndicatorId(), entity.getLocation(), currentHealth, maxHealth);
+            activeIndicators.put(entityId, created);
+            long interval = config.getUpdateIntervalTicks();
+            created.setTask(Schedulers.timerForEntity(plugin, entity, interval, interval,
+                    () -> tickIndicator(created), () -> removeIndicator(created)));
+            updateIndicatorViewers(created, entity);
         } else {
             indicator.setLastHealth(currentHealth);
             indicator.setLastMaxHealth(maxHealth);
@@ -199,23 +199,20 @@ public final class IndicatorManager {
 
     public void removeEntity(int entityId) {
         HealthIndicator indicator = activeIndicators.remove(entityId);
-        if (indicator == null || !Platform.hasPacketEvents()) return;
-        destroyForViewers(indicator);
+        if (indicator == null) return;
+        indicator.cancelTask();
+        if (Platform.hasPacketEvents()) destroyForViewers(indicator);
     }
 
-    private void tick() {
+    private void removeIndicator(HealthIndicator indicator) {
+        activeIndicators.remove(indicator.getHostEntityId(), indicator);
+        indicator.cancelTask();
+        if (Platform.hasPacketEvents()) destroyForViewers(indicator);
+    }
+
+    private void tickPopups() {
         if (!Platform.hasPacketEvents()) return;
-
         long now = System.currentTimeMillis();
-        // Popups are spawned even when indicators are off, so they expire first and on their own:
-        // a disabled or failing indicator pass must never leave popups frozen in the air.
-        tickPopups(now);
-        if (config.isIndicatorsEnabled()) {
-            tickIndicators(now);
-        }
-    }
-
-    private void tickPopups(long now) {
         activePopups.entrySet().removeIf(entry -> {
             VariationPopup popup = entry.getValue();
             try {
@@ -233,37 +230,33 @@ public final class IndicatorManager {
         });
     }
 
-    private void tickIndicators(long now) {
-        long maxDamageAgeMs = (long) (config.getDamagedDisplaySeconds() * 1000.0);
-
-        activeIndicators.entrySet().removeIf(entry -> {
-            HealthIndicator ind = entry.getValue();
-            try {
-                return tickIndicator(ind, now, maxDamageAgeMs);
-            } catch (Throwable t) {
-                plugin.getLogger().log(Level.WARNING, "Failed to update health indicator, removing it", t);
-                destroyForViewers(ind);
-                return true;
-            }
-        });
+    private void tickIndicator(HealthIndicator ind) {
+        boolean remove;
+        try {
+            remove = !Platform.hasPacketEvents() || !config.isIndicatorsEnabled() || updateIndicator(ind);
+        } catch (Throwable t) {
+            plugin.getLogger().log(Level.WARNING, "Failed to update health indicator, removing it", t);
+            remove = true;
+        }
+        if (remove) {
+            removeIndicator(ind);
+        }
     }
 
-    private boolean tickIndicator(HealthIndicator ind, long now, long maxDamageAgeMs) {
+    private boolean updateIndicator(HealthIndicator ind) {
         LivingEntity host = ind.getHostEntity();
         if (host == null || !host.isValid() || host.isDead() || host.getHealth() <= 0 || !canShowIndicator(host)) {
-            destroyForViewers(ind);
             return true;
         }
 
-        if (config.isShowOnlyWhenDamaged() && (now - ind.getLastDamageTime() > maxDamageAgeMs)) {
-            destroyForViewers(ind);
+        long maxDamageAgeMs = (long) (config.getDamagedDisplaySeconds() * 1000.0);
+        if (config.isShowOnlyWhenDamaged() && (System.currentTimeMillis() - ind.getLastDamageTime() > maxDamageAgeMs)) {
             return true;
         }
 
         Location currentLoc = host.getLocation();
         Location lastLoc = ind.getLastLocation();
         if (lastLoc != null && lastLoc.getWorld() != currentLoc.getWorld()) {
-            // Host changed worlds: drop it for the old world's viewers, updateIndicatorViewers respawns it.
             destroyForViewers(ind);
             ind.setLastLocation(currentLoc.clone());
         } else if (lastLoc == null || lastLoc.distanceSquared(currentLoc) > 0.002) {
@@ -320,7 +313,6 @@ public final class IndicatorManager {
         activePopups.put(popupId, popup);
     }
 
-    /** Removes the oldest popups of this kind above the entity so the new one keeps it within max-per-entity. */
     private void makeRoomForPopup(int hostId, boolean isDamage) {
         int max = config.getPopupMaxPerEntity();
         if (max <= 0) return;
@@ -347,7 +339,6 @@ public final class IndicatorManager {
         World world = loc.getWorld();
         if (world == null) return;
 
-        // A viewer who left or changed worlds already lost the entity client-side; forgetting them lets it respawn on return.
         indicator.getViewers().removeIf(uid -> {
             Player viewer = plugin.getServer().getPlayer(uid);
             return viewer == null || viewer.getWorld() != world;
@@ -598,8 +589,6 @@ public final class IndicatorManager {
                 .replace("<max>", maxStr)
                 .replace("<percent>", percentStr);
 
-        // The name goes in as a component: custom names arrive with legacy § colors, which MiniMessage rejects,
-        // and may contain text that would otherwise be parsed as tags.
         return TextUtil.parse(formatted, Placeholder.component("name", resolveName(entity)));
     }
 
@@ -626,7 +615,6 @@ public final class IndicatorManager {
         return isEligibleType(entity) && isShown(entity) && !isMarked(entity, HIDE_POPUPS_KEY);
     }
 
-    /** Invisible entities and spectators would be given away by a floating bar or number. */
     private boolean isShown(LivingEntity entity) {
         if (entity.isInvisible()) return false;
         return !(entity instanceof Player player) || player.getGameMode() != GameMode.SPECTATOR;
@@ -641,6 +629,7 @@ public final class IndicatorManager {
 
         String typeName = entity.getType().name().toUpperCase(Locale.ROOT);
         if (config.getBlacklist().contains(typeName)) return false;
+        if (GladiatorHook.isGladiator(entity)) return false;
 
         if (entity instanceof Player) {
             return config.isShowForPlayers();

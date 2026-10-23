@@ -19,6 +19,15 @@ Above their heads, sleek real-time health indicators and floating damage/heal po
 [*] [B]Multi-Platform & Folia Ready:[/B] Native support for Paper, Spigot, Purpur, and Folia region threading without race conditions or main-thread hitching.
 [/LIST]
 
+[B][SIZE=5]🔧 Changelog v1.0.8[/SIZE][/B]
+[LIST]
+[*] [B]ZombieGladiators Detected Automatically:[/B] With ZombieGladiators installed, MobVitals ignores its gladiators completely (no health bar, popups or corpse animation) and leaves them to ZombieGladiators. Works with any ZombieGladiators version on Paper, Spigot, Purpur and Folia; every other mob is handled as usual.
+[*] [B]Corpses on the Ground:[/B] Bodies lie right below where the mob died; mobs killed mid-air or mid-knockback no longer float, and nothing moves a body once it lies down.
+[*] [B]No Pushing, No Red Tint:[/B] Corpses keep their natural colors and never push players (tiny hitbox, and the dying mob stops colliding on the server), on Folia too.
+[*] [B]Real Folia Support:[/B] Health bars and corpses now run on their region's thread. Folia used to throw "Thread failed main thread check", making bars vanish right after appearing and breaking corpses.
+[*] [B]Cancelled Deaths:[/B] A death cancelled by another plugin (Paper) no longer leaves a corpse of a living mob.
+[/LIST]
+
 [B][SIZE=5]🔧 Changelog v1.0.7[/SIZE][/B]
 [LIST]
 [*] [B]One Popup per Hit and Heal, No Clutter:[/B] Each entity shows at most one damage and one heal popup at a time; a new hit or heal replaces the older one ([FONT=Courier New]variation-popups.max-per-entity[/FONT], default 1, 0 = no limit).
